@@ -49,12 +49,15 @@ FROM OPENJSON(@json) WITH (
 
                 foreach (var file in GetFiles(RootPath).Take(1))
                 {
-                    var builder = new StringBuilder("[")
-                        .AppendJoin(',', ReadLines(file.Item2).Take(1))
-                        .Append(']');
-                    jsonParam.Value = builder.ToString();
-                    dateParam.Value = file.Item1;
-                    sqlCmd.ExecuteNonQuery();
+                    foreach (var chunk in ReadLines(file.Item2).Partition(100000))
+                    {
+                        var builder = new StringBuilder("[")
+                            .AppendJoin(',', chunk)
+                            .Append(']');
+                        jsonParam.Value = builder.ToString();
+                        dateParam.Value = file.Item1;
+                        sqlCmd.ExecuteNonQuery();
+                    }
                 }
                 sql.Close();
             }
@@ -87,7 +90,39 @@ FROM OPENJSON(@json) WITH (
             {
                 var line = reader.ReadLine();
                 while (line != null)
+                {
                     yield return line;
+                    line = reader.ReadLine();
+                }
+            }
+        }
+    }
+
+    internal static class EnumerableExtensions
+    {
+        public static IEnumerable<IEnumerable<T>> Partition<T>(this IEnumerable<T> source, int size)
+        {
+            var enumerator = source.GetEnumerator();
+            var more = true;
+            do
+            {
+                yield return Inner();
+            } while (more);
+
+            IEnumerable<T> Inner()
+            {
+                for (var i = 0; i < size; i++)
+                {
+                    if (enumerator.MoveNext())
+                    {
+                        yield return enumerator.Current;
+                    }
+                    else
+                    {
+                        more = false;
+                        break;
+                    }
+                }
             }
         }
     }
