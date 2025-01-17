@@ -1,26 +1,62 @@
 ﻿using System.Collections.Generic;
+using System.Data;
 using System.IO.Compression;
+using System.Text;
+using Microsoft.Data.SqlClient;
 
 namespace JEDCMobilityManager
 {
     internal class DataLoader
     {
         private static string RootPath = @"D:\JEDC Data\quadrant-io-mobility-data";
+        private static string InsertCommand = @$"
+INSERT INTO [dbo].[Point]
+SELECT @date AS [Date], *
+FROM OPENJSON(@json) WITH (
+	[DeviceId] VARCHAR(MAX) '$.device_id',
+	[IdType] VARCHAR(MAX) '$.id_type',
+	[Latitude] DECIMAL(8,4) '$.latitude',
+	[Longitude] DECIMAL(8,4) '$.longitude',
+	[HorizontalAccuracy] DECIMAL(4,2) '$.horizontal_accuracy',
+	[IpAddress] VARCHAR(16) '$.ip_address',
+	[DeviceOS] VARCHAR(MAX) '$.device_os',
+	[OSVersion] VARCHAR(4) '$.os_version',
+	[UserAgent] VARCHAR(MAX) '$.user_agent',
+	[Country] VARCHAR(2) '$.country',
+	[SourceId] VARCHAR(MAX) '$.source_id',
+	[PublisherId] VARCHAR(MAX) '$.publisher_id',
+	[AppId] VARCHAR(MAX) '$.app_id',
+	[LocationContext] VARCHAR(MAX) '$.location_context',
+	[Geohash] VARCHAR(MAX) '$.geohash',
+	[Consent] VARCHAR(4) '$.consent',
+	[QuadId] VARCHAR(MAX) '$.quad_id',
+	[Time] BIGINT '$.timestamp'
+)";
 
         public void Start()
         {
-
-
-            foreach (var file in GetFiles(RootPath))
+            using (var sql = new SqlConnection(new SqlConnectionStringBuilder {
+                DataSource = "localhost",
+                InitialCatalog = "JEDCMobility",
+                IntegratedSecurity = true,
+                TrustServerCertificate = true
+            }.ToString()))
+            using (var sqlCmd = new SqlCommand(InsertCommand, sql))
             {
-                Console.WriteLine("[");
-                foreach (var line in ReadLines(file.Item2).Take(2))
-                {
-                    Console.Write(line);
-                    Console.WriteLine(",");
-                }
+                var jsonParam = sqlCmd.Parameters.Add("@json", SqlDbType.NVarChar);
+                var dateParam = sqlCmd.Parameters.Add("@date", SqlDbType.Date);
+                sql.Open();
 
-                Console.WriteLine("]");
+                foreach (var file in GetFiles(RootPath).Take(1))
+                {
+                    var builder = new StringBuilder("[")
+                        .AppendJoin(',', ReadLines(file.Item2).Take(1))
+                        .Append(']');
+                    jsonParam.Value = builder.ToString();
+                    dateParam.Value = file.Item1;
+                    sqlCmd.ExecuteNonQuery();
+                }
+                sql.Close();
             }
         }
 
