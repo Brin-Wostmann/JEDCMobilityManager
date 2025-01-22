@@ -14,10 +14,11 @@ INSERT INTO [dbo].[Point]
 SELECT @date AS [Date], *
 FROM OPENJSON(@json) WITH (
 	[DeviceId] VARCHAR(MAX) '$.device_id',
+	[Time] VARCHAR(MAX)  '$.timestamp',
 	[IdType] VARCHAR(MAX) '$.id_type',
-	[Latitude] DECIMAL(8,4) '$.latitude',
-	[Longitude] DECIMAL(8,4) '$.longitude',
-	[HorizontalAccuracy] DECIMAL(4,2) '$.horizontal_accuracy',
+	[Latitude] VARCHAR(MAX)  '$.latitude',
+	[Longitude] VARCHAR(MAX)  '$.longitude',
+	[HorizontalAccuracy] VARCHAR(MAX)  '$.horizontal_accuracy',
 	[IpAddress] VARCHAR(16) '$.ip_address',
 	[DeviceOS] VARCHAR(MAX) '$.device_os',
 	[OSVersion] VARCHAR(4) '$.os_version',
@@ -29,8 +30,7 @@ FROM OPENJSON(@json) WITH (
 	[LocationContext] VARCHAR(MAX) '$.location_context',
 	[Geohash] VARCHAR(MAX) '$.geohash',
 	[Consent] VARCHAR(4) '$.consent',
-	[QuadId] VARCHAR(MAX) '$.quad_id',
-	[Time] BIGINT '$.timestamp'
+	[QuadId] VARCHAR(MAX) '$.quad_id'
 )";
 
         public void Start()
@@ -47,9 +47,9 @@ FROM OPENJSON(@json) WITH (
                 var dateParam = sqlCmd.Parameters.Add("@date", SqlDbType.Date);
                 sql.Open();
 
-                foreach (var file in GetFiles(RootPath).Take(1))
+                foreach (var file in GetFiles(RootPath))
                 {
-                    foreach (var chunk in ReadLines(file.Item2).Partition(100000))
+                    foreach (var chunk in ReadLines(file.Item2).Partition(1000000))
                     {
                         var builder = new StringBuilder("[")
                             .AppendJoin(',', chunk)
