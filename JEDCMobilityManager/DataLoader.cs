@@ -2,6 +2,7 @@
 using System.Data;
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Data.SqlClient;
 
 namespace JEDCMobilityManager
@@ -10,14 +11,14 @@ namespace JEDCMobilityManager
     {
         private static string RootPath = @"D:\JEDC Data\quadrant-io-mobility-data";
         private static string InsertCommand = @$"
-INSERT INTO [dbo].[Point]
-SELECT @date AS [Date], *
+INSERT INTO [dbo].[Point] ([TimeStamp],                            [DeviceId], [IdType], [Latitude], [Longitude], [HorizontalAccuracy], [IpAddress], [DeviceOS], [OSVersion], [UserAgent], [Country], [SourceId], [PublisherId], [AppId], [LocationContext], [Geohash], [Consent], [QuadId])
+SELECT DATEADD(SECOND, [TimeStamp] / 1000, '1970-01-01 00:00:00'), [DeviceId], [IdType], [Latitude], [Longitude], [HorizontalAccuracy], [IpAddress], [DeviceOS], [OSVersion], [UserAgent], [Country], [SourceId], [PublisherId], [AppId], [LocationContext], [Geohash], [Consent], [QuadId]
 FROM OPENJSON(@json) WITH (
+	[TimeStamp] BIGINT '$.timestamp',
 	[DeviceId] VARCHAR(MAX) '$.device_id',
-	[Time] VARCHAR(MAX)  '$.timestamp',
 	[IdType] VARCHAR(MAX) '$.id_type',
-	[Latitude] VARCHAR(MAX)  '$.latitude',
-	[Longitude] VARCHAR(MAX)  '$.longitude',
+	[Latitude] DECIMAL(8,5)  '$.latitude',
+	[Longitude] DECIMAL(8,5)  '$.longitude',
 	[HorizontalAccuracy] VARCHAR(MAX)  '$.horizontal_accuracy',
 	[IpAddress] VARCHAR(16) '$.ip_address',
 	[DeviceOS] VARCHAR(MAX) '$.device_os',
@@ -39,47 +40,54 @@ FROM OPENJSON(@json) WITH (
                 DataSource = "localhost",
                 InitialCatalog = "JEDCMobility",
                 IntegratedSecurity = true,
-                TrustServerCertificate = true
+                TrustServerCertificate = true,
+                ConnectTimeout = 0,
+                CommandTimeout = 0
             }.ToString()))
             using (var sqlCmd = new SqlCommand(InsertCommand, sql))
             {
                 var jsonParam = sqlCmd.Parameters.Add("@json", SqlDbType.NVarChar);
-                var dateParam = sqlCmd.Parameters.Add("@date", SqlDbType.Date);
                 sql.Open();
 
-                foreach (var file in GetFiles(RootPath))
+                foreach (var chunk in ReadLines(GetFiles(RootPath)).Partition(1000000))
                 {
-                    foreach (var chunk in ReadLines(file.Item2).Partition(1000000))
-                    {
-                        var builder = new StringBuilder("[")
-                            .AppendJoin(',', chunk)
-                            .Append(']');
-                        jsonParam.Value = builder.ToString();
-                        dateParam.Value = file.Item1;
-                        sqlCmd.ExecuteNonQuery();
-                    }
+                    var builder = new StringBuilder("[")
+                        .AppendJoin(',', chunk)
+                        .Append(']');
+                    jsonParam.Value = builder.ToString();
+                    sqlCmd.ExecuteNonQuery();
                 }
                 sql.Close();
             }
         }
 
-        private IEnumerable<Tuple<DateOnly, FileInfo>> GetFiles(string root)
+        private void CheckTimestamp(string json)
         {
-            foreach (var yearDir in new DirectoryInfo(root).EnumerateDirectories())
+            using (var jdoc = JsonDocument.Parse(json))
             {
-                var year = int.Parse(yearDir.Name.Split('=').Last());
-                foreach (var monthDir in yearDir.EnumerateDirectories())
+                var timestamp = jdoc.RootElement.GetProperty("timestamp");
+
+                var strVal = timestamp.ToString();
+                if (!timestamp.TryGetInt64(out var value))
                 {
-                    var month = int.Parse(monthDir.Name.Split('=').Last());
-                    foreach (var dayDir in monthDir.EnumerateDirectories())
-                    {
-                        var day = int.Parse(dayDir.Name.Split('=').Last());
-                        var date = new DateOnly(year, month, day);
-                        foreach (var file in dayDir.EnumerateFiles())
-                            yield return Tuple.Create(date, file);
-                    }
                 }
             }
+        }
+
+        private IEnumerable<FileInfo> GetFiles(string root)
+        {
+            foreach (var yearDir in new DirectoryInfo(root).EnumerateDirectories())
+            foreach (var monthDir in yearDir.EnumerateDirectories())
+            foreach (var dayDir in monthDir.EnumerateDirectories())
+            foreach (var file in dayDir.EnumerateFiles())
+                    yield return file;
+        }
+
+        private IEnumerable<string> ReadLines(IEnumerable<FileInfo> files)
+        {
+            foreach (var file in files)
+            foreach (var line in ReadLines(file))
+                yield return line;
         }
 
         private IEnumerable<string> ReadLines(FileInfo file)
