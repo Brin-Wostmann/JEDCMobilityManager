@@ -33,8 +33,11 @@ namespace JEDCMobilityManager
                     cmd.ExecuteNonQuery();
 
                 using (var cmd = new InsertCommand(sql))
-                    foreach (var line in ReadLines(GetFiles(RootPath)).Take(10))
+                {
+                    foreach (var line in ReadLines(GetFiles(RootPath)))
                         cmd.Execute(line);
+                    cmd.Transaction.Commit();
+                }
 
                 ReadData(sql);
 
@@ -76,7 +79,10 @@ namespace JEDCMobilityManager
             foreach (var monthDir in yearDir.EnumerateDirectories())
             foreach (var dayDir in monthDir.EnumerateDirectories())
             foreach (var file in dayDir.EnumerateFiles())
+            {
+                Console.WriteLine($"[{DateTime.Now}] Starting {yearDir.Name}/{monthDir.Name}/{dayDir.Name}/{file.Name}");
                 yield return file;
+                        }
         }
 
         private static IEnumerable<string> ReadLines(IEnumerable<FileInfo> files)
@@ -118,6 +124,7 @@ namespace JEDCMobilityManager
 
         private class InsertCommand : IDisposable
         {
+            public SQLiteTransaction Transaction { get; private set; }
             private SQLiteCommand Cmd { get; set; }
             private IDictionary<string, SQLiteParameter> Parameters { get; set; }
 
@@ -130,8 +137,10 @@ namespace JEDCMobilityManager
                     { JsonValueKind.False, DbType.Boolean }
                 };
 
-                Cmd = new SQLiteCommand(GetInsertCommand(), sql);
+                Transaction = sql.BeginTransaction();
+                Cmd = new SQLiteCommand(GetInsertCommand(), sql, Transaction);
                 Parameters = PropertyKinds.ToDictionary(k => k.Key, v => Cmd.Parameters.Add($@"@{v.Key}", jmap[v.Value]));
+                Cmd.Prepare();
             }
 
             private string GetInsertCommand()
@@ -170,6 +179,7 @@ namespace JEDCMobilityManager
             public void Dispose()
             {
                 Cmd.Dispose();
+                Transaction.Dispose();
             }
         }
     }
