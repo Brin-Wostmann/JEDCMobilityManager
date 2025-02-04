@@ -15,7 +15,7 @@ INSERT INTO [dbo].[Point] ([TimeStamp],                            [DeviceId], [
 SELECT DATEADD(SECOND, [TimeStamp] / 1000, '1970-01-01 00:00:00'), [DeviceId], [IdType], [Latitude], [Longitude], [HorizontalAccuracy], [IpAddress], [DeviceOS], [OSVersion], [UserAgent], [Country], [SourceId], [PublisherId], [AppId], [LocationContext], [Geohash], [Consent], [QuadId]
 FROM OPENJSON(@json) WITH (
 	[TimeStamp] BIGINT '$.timestamp',
-	[DeviceId] VARCHAR(MAX) '$.device_id',
+	[DeviceId] VARCHAR(100) '$.device_id',
 	[IdType] VARCHAR(MAX) '$.id_type',
 	[Latitude] DECIMAL(8,5)  '$.latitude',
 	[Longitude] DECIMAL(8,5)  '$.longitude',
