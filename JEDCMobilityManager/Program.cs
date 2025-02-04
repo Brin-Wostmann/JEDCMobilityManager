@@ -6,7 +6,7 @@
         {
             var start = DateTime.Now;
             Console.WriteLine($"[{start}] Running...");
-            new DataLoader().Start();
+            new SqliteDataLoader().Start();
             var end = DateTime.Now;
             Console.WriteLine($"[{end}] Done!");
             var ellapsed = end - start;
