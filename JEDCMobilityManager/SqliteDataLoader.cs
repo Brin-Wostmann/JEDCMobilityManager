@@ -27,12 +27,10 @@ namespace JEDCMobilityManager
             {
                 sql.Open();
 
-                ReadData(sql);
+                DropTable(sql);
 
                 using (var cmd = new SQLiteCommand(GetCreateCommand(), sql))
                     cmd.ExecuteNonQuery();
-
-                ReadData(sql);
 
                 using (var cmd = new InsertCommand(sql))
                     foreach (var line in ReadLines(GetFiles(RootPath)).Take(10))
@@ -44,9 +42,15 @@ namespace JEDCMobilityManager
             }
         }
 
+        private static void DropTable(SQLiteConnection sql)
+        {
+            using (var cmd = new SQLiteCommand($"DROP TABLE [{TableName}]", sql))
+                cmd.ExecuteNonQuery();
+        }
+
         private static void ReadData(SQLiteConnection sql)
         {
-            using (var cmd = new SQLiteCommand($"SELECT TOP 10 * FROM [{TableName}]", sql))
+            using (var cmd = new SQLiteCommand($"SELECT COUNT(*) FROM [{TableName}]", sql))
             using (var reader = cmd.ExecuteReader())
             {
                 for (var i = 0; i < reader.FieldCount; i++)
@@ -106,10 +110,10 @@ namespace JEDCMobilityManager
                 { JsonValueKind.False, "INTEGER" }
             };
 
-            var builder = new StringBuilder($"CREATE TABLE IF NOT EXISTS [{TableName}] {{ [Id] INT PRIMARY KEY");
+            var builder = new StringBuilder($"CREATE TABLE IF NOT EXISTS [{TableName}] ( [Id] INTEGER PRIMARY KEY");
             foreach (var prop in PropertyKinds)
                 builder.AppendLine($",[{prop.Key}] {jmap[prop.Value]} NOT NULL");
-            return builder.AppendLine("}").ToString();
+            return builder.AppendLine(")").ToString();
         }
 
         private class InsertCommand : IDisposable
@@ -134,10 +138,10 @@ namespace JEDCMobilityManager
             {
                 var tBuilder = new StringBuilder($"INSERT INTO [{TableName}] (");
                 var vBuilder = new StringBuilder(" VALUES (");
-                foreach (var p in Parameters)
+                foreach (var p in PropertyKinds)
                 {
-                    tBuilder.Append(p.Key + ", ");
-                    vBuilder.Append(p.Value.ParameterName + ", ");
+                    tBuilder.Append($"[{p.Key}],");
+                    vBuilder.Append($"@{p.Key},");
                 }
                 tBuilder.Length--;
                 vBuilder.Length--;
@@ -155,7 +159,12 @@ namespace JEDCMobilityManager
             public void SetParameters(string json)
             {
                 foreach (var prop in JsonDocument.Parse(json).RootElement.EnumerateObject())
-                    Parameters[prop.Name].Value = prop.Value.GetString();
+                    Parameters[prop.Name].Value = prop.Value.ValueKind switch {
+                        JsonValueKind.String => prop.Value.GetString(),
+                        JsonValueKind.Number => prop.Value.GetDecimal(),
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false
+                    };
             }
 
             public void Dispose()
