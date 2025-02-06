@@ -1,8 +1,5 @@
-﻿using System.Collections.Generic;
-using System.Data;
-using System.IO.Compression;
+﻿using System.Data;
 using System.Text;
-using System.Text.Json;
 using JEDCMobilityManager.Utility;
 using Microsoft.Data.SqlClient;
 
@@ -14,6 +11,7 @@ namespace JEDCMobilityManager
         private string HeaderCommand { get; set; }
         private string BodyCommand { get; set; }
         private string FooterCommand { get; set; }
+        public SqlConnectionStringBuilder Connection { get; set; }
 
         public DataLoader(string dataRoot)
         {
@@ -21,37 +19,49 @@ namespace JEDCMobilityManager
             HeaderCommand = File.ReadAllText(@"DataLoaderScripts\Header.sql");
             BodyCommand = File.ReadAllText(@"DataLoaderScripts\Body.sql");
             FooterCommand = File.ReadAllText(@"DataLoaderScripts\Footer.sql");
-        }
-
-        public void Start()
-        {
-            using (var sql = new SqlConnection(new SqlConnectionStringBuilder {
+            Connection = new SqlConnectionStringBuilder {
                 DataSource = "localhost",
                 InitialCatalog = "JEDCMobility",
                 IntegratedSecurity = true,
                 TrustServerCertificate = true,
                 ConnectTimeout = 0,
                 CommandTimeout = 0
-            }.ToString()))
+            };
+        }
+
+        public void Start()
+        {
+            using (var sql = new SqlConnection(Connection.ToString()))
             {
                 sql.Open();
-
-                using (var sqlCmd = new SqlCommand(BodyCommand, sql))
-                {
-                    var jsonParam = sqlCmd.Parameters.Add("@json", SqlDbType.NVarChar);
-                    Task cmdTask = null;
-                    foreach (var chunk in GetFiles(DataRoot).ReadLines().Partition(100000))
-                    {
-                        var builder = new StringBuilder("[")
-                            .AppendJoin(',', chunk)
-                            .Append(']');
-                        jsonParam.Value = builder.ToString();
-                        cmdTask?.Wait();
-                        cmdTask = sqlCmd.ExecuteNonQueryAsync();
-                    }
-                }
-
+                ExecuteCommand(sql, HeaderCommand);
+                ImportData(sql);
+                ExecuteCommand(sql, FooterCommand);
                 sql.Close();
+            }
+        }
+
+        private void ExecuteCommand(SqlConnection sql, string command)
+        {
+            using (var cmd = new SqlCommand(command, sql))
+                cmd.ExecuteNonQuery();
+        }
+
+        private void ImportData(SqlConnection sql)
+        {
+            using (var sqlCmd = new SqlCommand(BodyCommand, sql))
+            {
+                var jsonParam = sqlCmd.Parameters.Add("@json", SqlDbType.NVarChar);
+                Task? cmdTask = null;
+                foreach (var chunk in GetFiles(DataRoot).ReadLines().Partition(100000))
+                {
+                    var builder = new StringBuilder("[")
+                        .AppendJoin(',', chunk)
+                        .Append(']');
+                    jsonParam.Value = builder.ToString();
+                    cmdTask?.Wait();
+                    cmdTask = sqlCmd.ExecuteNonQueryAsync();
+                }
             }
         }
 
