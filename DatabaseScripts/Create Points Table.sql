@@ -35,7 +35,11 @@ CREATE TABLE [dbo].[Device] (
 )
 GO
 
+ALTER TABLE [dbo].[Device]  
+ADD CONSTRAINT UQ_Device_DeviceId UNIQUE ([DeviceId])
+GO
+
 ALTER TABLE [dbo].[Point] 
 ADD CONSTRAINT [FK_Point_Device] FOREIGN KEY ([DeviceId]) 
 REFERENCES [dbo].[Device] ([Id]) 
-ON DELETE CASCADE;
+GO

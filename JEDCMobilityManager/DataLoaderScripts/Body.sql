@@ -1,6 +1,8 @@
 
-INSERT INTO [dbo].[Point] ([TimeStamp],                            [DeviceId], [IdType], [Latitude], [Longitude], [HorizontalAccuracy], [IpAddress], [DeviceOS], [OSVersion], [UserAgent], [Country], [SourceId], [PublisherId], [AppId], [LocationContext], [Geohash], [Consent], [QuadId])
-SELECT DATEADD(SECOND, [TimeStamp] / 1000, '1970-01-01 00:00:00'), [DeviceId], [IdType], [Latitude], [Longitude], [HorizontalAccuracy], [IpAddress], [DeviceOS], [OSVersion], [UserAgent], [Country], [SourceId], [PublisherId], [AppId], [LocationContext], [Geohash], [Consent], [QuadId]
+TRUNCATE TABLE #Import;
+
+INSERT INTO #Import
+SELECT *
 FROM OPENJSON(@json) WITH (
 	[TimeStamp] BIGINT '$.timestamp',
 	[DeviceId] VARCHAR(100) '$.device_id',
@@ -20,4 +22,16 @@ FROM OPENJSON(@json) WITH (
 	[Geohash] VARCHAR(MAX) '$.geohash',
 	[Consent] VARCHAR(4) '$.consent',
 	[QuadId] VARCHAR(MAX) '$.quad_id'
-)
+);
+
+INSERT INTO [dbo].[Device]
+SELECT DISTINCT I.[DeviceId]
+FROM #Import I
+LEFT JOIN [dbo].[Device] D ON D.[DeviceId] = I.[DeviceId]
+WHERE D.[Id] IS NULL;
+
+INSERT INTO [dbo].[Point] ([TimeStamp],                   [DeviceId], [IdType],   [Latitude],   [Longitude],   [HorizontalAccuracy],   [IpAddress],   [DeviceOS],   [OSVersion],   [UserAgent],   [Country],   [SourceId],   [PublisherId],   [AppId],   [LocationContext],   [Geohash],   [Consent],   [QuadId])
+SELECT DATEADD(SECOND, I.[TimeStamp] / 1000, '1/1/1970'), D.[Id],   I.[IdType], I.[Latitude], I.[Longitude], I.[HorizontalAccuracy], I.[IpAddress], I.[DeviceOS], I.[OSVersion], I.[UserAgent], I.[Country], I.[SourceId], I.[PublisherId], I.[AppId], I.[LocationContext], I.[Geohash], I.[Consent], I.[QuadId]
+FROM #Import I
+JOIN [dbo].[Device] D ON D.[DeviceId] = I.[DeviceId];
+

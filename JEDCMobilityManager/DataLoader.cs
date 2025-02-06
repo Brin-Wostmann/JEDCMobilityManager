@@ -53,7 +53,7 @@ namespace JEDCMobilityManager
             {
                 var jsonParam = sqlCmd.Parameters.Add("@json", SqlDbType.NVarChar);
                 Task? cmdTask = null;
-                foreach (var chunk in GetFiles(DataRoot).ReadLines().Partition(100000))
+                foreach (var chunk in GetFiles(DataRoot).ReadLines().Partition(100000).Take(1))
                 {
                     var builder = new StringBuilder("[")
                         .AppendJoin(',', chunk)
@@ -62,6 +62,7 @@ namespace JEDCMobilityManager
                     cmdTask?.Wait();
                     cmdTask = sqlCmd.ExecuteNonQueryAsync();
                 }
+                cmdTask?.Wait();
             }
         }
 
