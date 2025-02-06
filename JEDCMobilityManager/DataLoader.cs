@@ -44,19 +44,26 @@ FROM OPENJSON(@json) WITH (
                 ConnectTimeout = 0,
                 CommandTimeout = 0
             }.ToString()))
-            using (var sqlCmd = new SqlCommand(InsertCommand, sql))
             {
-                var jsonParam = sqlCmd.Parameters.Add("@json", SqlDbType.NVarChar);
                 sql.Open();
 
-                foreach (var chunk in ReadLines(GetFiles(RootPath)).Partition(1000000))
+                //using (var trans = sql.BeginTransaction())
+                using (var sqlCmd = new SqlCommand(InsertCommand, sql))
                 {
-                    var builder = new StringBuilder("[")
-                        .AppendJoin(',', chunk)
-                        .Append(']');
-                    jsonParam.Value = builder.ToString();
-                    sqlCmd.ExecuteNonQuery();
+                    var jsonParam = sqlCmd.Parameters.Add("@json", SqlDbType.NVarChar);
+                    Task cmdTask = null;
+                    foreach (var chunk in ReadLines(GetFiles(RootPath)).Partition(100000))
+                    {
+                        var builder = new StringBuilder("[")
+                            .AppendJoin(',', chunk)
+                            .Append(']');
+                        jsonParam.Value = builder.ToString();
+                        cmdTask?.Wait();
+                        cmdTask = sqlCmd.ExecuteNonQueryAsync();
+                    }
+                    //trans.Commit();
                 }
+
                 sql.Close();
             }
         }

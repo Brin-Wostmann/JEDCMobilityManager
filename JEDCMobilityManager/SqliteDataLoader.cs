@@ -27,22 +27,45 @@ namespace JEDCMobilityManager
             {
                 sql.Open();
 
-                DropTable(sql);
+                //DropTable(sql);
 
-                using (var cmd = new SQLiteCommand(GetCreateCommand(), sql))
-                    cmd.ExecuteNonQuery();
+                //using (var cmd = new SQLiteCommand(GetCreateCommand(), sql))
+                //    cmd.ExecuteNonQuery();
 
-                using (var cmd = new InsertCommand(sql))
-                {
-                    foreach (var line in ReadLines(GetFiles(RootPath)))
-                        cmd.Execute(line);
-                    cmd.Transaction.Commit();
-                }
+                //using (var cmd = new InsertCommand(sql))
+                //{
+                //    foreach (var line in ReadLines(GetFiles(RootPath)))
+                //        cmd.Execute(line);
+                //    cmd.Transaction.Commit();
+                //}
 
-                ReadData(sql);
+                //ReadData(sql);
+
+                CreateIndexes(sql);
 
                 sql.Clone();
             }
+        }
+
+        private static void CreateIndexes(SQLiteConnection sql)
+        {
+            var script = $@"
+--CREATE TABLE [Device] (
+--	[Id] TEXT PRIMARY KEY
+--);
+--INSERT INTO [Device]
+--SELECT DISTINCT [device_id]
+--FROM [{TableName}];
+--ALTER TABLE [{TableName}] 
+--ADD CONSTRAINT [FK_Point_Device]
+--FOREIGN KEY ([device_id]) 
+--REFERENCES [Device] ([Id]);
+CREATE INDEX [IX_Point_Device] ON [{TableName}] ([device_id]) 
+--INCLUDE ([timestamp], [latitude], [longitude]);
+";
+
+            using (var cmd = new SQLiteCommand(script, sql))
+                cmd.ExecuteNonQuery();
         }
 
         private static void DropTable(SQLiteConnection sql)
@@ -53,7 +76,7 @@ namespace JEDCMobilityManager
 
         private static void ReadData(SQLiteConnection sql)
         {
-            using (var cmd = new SQLiteCommand($"SELECT COUNT(*) FROM [{TableName}]", sql))
+            using (var cmd = new SQLiteCommand($"SELECT * FROM [{TableName}] LIMIT 1", sql))
             using (var reader = cmd.ExecuteReader())
             {
                 for (var i = 0; i < reader.FieldCount; i++)
