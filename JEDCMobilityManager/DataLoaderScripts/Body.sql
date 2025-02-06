@@ -6,22 +6,22 @@ SELECT *
 FROM OPENJSON(@json) WITH (
 	[TimeStamp] BIGINT '$.timestamp',
 	[DeviceId] VARCHAR(100) '$.device_id',
-	[IdType] VARCHAR(MAX) '$.id_type',
+	[IdType] CHAR(4) '$.id_type',
 	[Latitude] DECIMAL(8,5)  '$.latitude',
 	[Longitude] DECIMAL(8,5)  '$.longitude',
-	[HorizontalAccuracy] VARCHAR(MAX)  '$.horizontal_accuracy',
-	[IpAddress] VARCHAR(16) '$.ip_address',
-	[DeviceOS] VARCHAR(MAX) '$.device_os',
+	[HorizontalAccuracy] DECIMAL(8,4)  '$.horizontal_accuracy',
+	[IpAddress] VARCHAR(39) '$.ip_address',
+	[DeviceOS] VARCHAR(7) '$.device_os',
 	[OSVersion] VARCHAR(4) '$.os_version',
 	[UserAgent] VARCHAR(MAX) '$.user_agent',
-	[Country] VARCHAR(2) '$.country',
-	[SourceId] VARCHAR(MAX) '$.source_id',
-	[PublisherId] VARCHAR(MAX) '$.publisher_id',
-	[AppId] VARCHAR(MAX) '$.app_id',
-	[LocationContext] VARCHAR(MAX) '$.location_context',
-	[Geohash] VARCHAR(MAX) '$.geohash',
-	[Consent] VARCHAR(4) '$.consent',
-	[QuadId] VARCHAR(MAX) '$.quad_id'
+	[Country] CHAR(2) '$.country',
+	[SourceId] CHAR(2) '$.source_id',
+	[PublisherId] VARCHAR(64) '$.publisher_id',
+	[AppId] VARCHAR(64) '$.app_id',
+	[LocationContext] VARCHAR(1) '$.location_context',
+	[Geohash] CHAR(12) '$.geohash',
+	[Consent] CHAR(1) '$.consent',
+	[QuadId] CHAR(64) '$.quad_id'
 );
 
 INSERT INTO [dbo].[Device]

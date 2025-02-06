@@ -4,22 +4,22 @@ GO
 CREATE TABLE [dbo].[Point] (
     [TimeStamp] DATETIME NOT NULL,
     [DeviceId] INT NOT NULL,
-    [IdType] VARCHAR(MAX) NOT NULL,
+    [IdType] CHAR(4) NOT NULL, --
     [Latitude] DECIMAL(8,5) NOT NULL,
     [Longitude] DECIMAL(8,5) NOT NULL,
-    [HorizontalAccuracy] VARCHAR(MAX) NOT NULL,
-    [IpAddress] VARCHAR(16) NOT NULL,
-    [DeviceOS] VARCHAR(MAX) NOT NULL,
+    [HorizontalAccuracy] DECIMAL(8,4) NOT NULL,
+    [IpAddress] VARCHAR(39) NOT NULL,
+    [DeviceOS] VARCHAR(7) NOT NULL,
     [OSVersion] VARCHAR(4) NOT NULL,
     [UserAgent] VARCHAR(MAX) NOT NULL,
-    [Country] VARCHAR(2) NOT NULL,
-    [SourceId] VARCHAR(MAX) NOT NULL,
-    [PublisherId] VARCHAR(MAX) NOT NULL,
-    [AppId] VARCHAR(MAX) NOT NULL,
-    [LocationContext] VARCHAR(MAX) NOT NULL,
-    [Geohash] VARCHAR(MAX) NOT NULL,
-    [Consent] VARCHAR(4) NOT NULL,
-    [QuadId] VARCHAR(MAX) NOT NULL
+    [Country] CHAR(2) NOT NULL,
+    [SourceId] CHAR(2) NOT NULL,
+    [PublisherId] VARCHAR(64) NOT NULL,
+    [AppId] VARCHAR(64) NOT NULL,
+    [LocationContext] VARCHAR(1) NOT NULL,
+    [Geohash] CHAR(12) NOT NULL,
+    [Consent] CHAR(1) NOT NULL,
+    [QuadId] CHAR(64) NOT NULL
 )
 
 CREATE CLUSTERED COLUMNSTORE INDEX CCI_Point
