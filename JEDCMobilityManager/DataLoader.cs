@@ -53,7 +53,7 @@ namespace JEDCMobilityManager
             {
                 var jsonParam = sqlCmd.Parameters.Add("@json", SqlDbType.NVarChar);
                 Task? cmdTask = null;
-                foreach (var chunk in GetFiles(DataRoot).ReadLines().Partition(100000))
+                foreach (var chunk in GetFiles(DataRoot).ReadLines().Skip(87400000).Partition(100000))
                 {
                     var builder = new StringBuilder("[")
                         .AppendJoin(',', chunk)

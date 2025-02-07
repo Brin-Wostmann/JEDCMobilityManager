@@ -7,7 +7,7 @@ CREATE TABLE [dbo].[Point] (
     [IdType] CHAR(4) NOT NULL,
     [Latitude] DECIMAL(8,5) NOT NULL,
     [Longitude] DECIMAL(8,5) NOT NULL,
-    [HorizontalAccuracy] DECIMAL(8,4) NOT NULL,
+    [HorizontalAccuracy] DECIMAL(10,5) NOT NULL,
     [IpAddress] VARCHAR(39) NOT NULL,
     [DeviceOS] VARCHAR(7) NOT NULL,
     [OSVersion] VARCHAR(4) NOT NULL,

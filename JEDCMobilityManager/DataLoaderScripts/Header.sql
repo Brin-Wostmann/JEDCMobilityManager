@@ -8,7 +8,7 @@ CREATE TABLE #Import (
 	[IdType] CHAR(4),
 	[Latitude] DECIMAL(8,5),
 	[Longitude] DECIMAL(8,5),
-	[HorizontalAccuracy] DECIMAL(8,4),
+	[HorizontalAccuracy] DECIMAL(10,5),
 	[IpAddress] VARCHAR(39),
 	[DeviceOS] VARCHAR(7),
 	[OSVersion] VARCHAR(4),
