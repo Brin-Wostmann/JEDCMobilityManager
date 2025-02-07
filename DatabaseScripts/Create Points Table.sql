@@ -4,7 +4,7 @@ GO
 CREATE TABLE [dbo].[Point] (
     [TimeStamp] DATETIME NOT NULL,
     [DeviceId] INT NOT NULL,
-    [IdType] CHAR(4) NOT NULL, --
+    [IdType] CHAR(4) NOT NULL,
     [Latitude] DECIMAL(8,5) NOT NULL,
     [Longitude] DECIMAL(8,5) NOT NULL,
     [HorizontalAccuracy] DECIMAL(8,4) NOT NULL,
@@ -22,11 +22,8 @@ CREATE TABLE [dbo].[Point] (
     [QuadId] CHAR(64) NOT NULL
 )
 
-CREATE CLUSTERED COLUMNSTORE INDEX CCI_Point
-ON [dbo].[Point];
-GO
-
-CREATE INDEX IX_Point_DeviceId ON [dbo].[Point] ([DeviceId])
+CREATE CLUSTERED COLUMNSTORE INDEX [CCI_Point]
+ON [dbo].[Point]
 GO
 
 CREATE TABLE [dbo].[Device] (
