@@ -9,7 +9,7 @@ FROM OPENJSON(@json) WITH (
 	[IdType] CHAR(4) '$.id_type',
 	[Latitude] DECIMAL(8,5)  '$.latitude',
 	[Longitude] DECIMAL(8,5)  '$.longitude',
-	[HorizontalAccuracy] DECIMAL(10,5)  '$.horizontal_accuracy',
+	[HorizontalAccuracy] REAL  '$.horizontal_accuracy',
 	[IpAddress] VARCHAR(39) '$.ip_address',
 	[DeviceOS] VARCHAR(7) '$.device_os',
 	[OSVersion] VARCHAR(4) '$.os_version',

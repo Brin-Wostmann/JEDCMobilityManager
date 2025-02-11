@@ -7,7 +7,7 @@ CREATE TABLE [dbo].[Point] (
     [IdType] CHAR(4) NOT NULL,
     [Latitude] DECIMAL(8,5) NOT NULL,
     [Longitude] DECIMAL(8,5) NOT NULL,
-    [HorizontalAccuracy] DECIMAL(10,5) NOT NULL,
+    [HorizontalAccuracy] REAL NOT NULL,
     [IpAddress] VARCHAR(39) NOT NULL,
     [DeviceOS] VARCHAR(7) NOT NULL,
     [OSVersion] VARCHAR(4) NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE [dbo].[Point] (
     [LocationContext] VARCHAR(1) NOT NULL,
     [Geohash] CHAR(12) NOT NULL,
     [Consent] CHAR(1) NOT NULL,
-    [QuadId] CHAR(64) NOT NULL
+    [QuadId] CHAR(64) NOT NULL,
 )
 
 CREATE CLUSTERED COLUMNSTORE INDEX [CCI_Point]
@@ -40,3 +40,6 @@ ALTER TABLE [dbo].[Point]
 ADD CONSTRAINT [FK_Point_Device] FOREIGN KEY ([DeviceId]) 
 REFERENCES [dbo].[Device] ([Id]) 
 GO
+
+
+--ALTER INDEX [CCI_Point] ON [dbo].[Point] REBUILD
