@@ -5,6 +5,8 @@ using Microsoft.Data.SqlClient;
 
 namespace JEDCMobilityManager
 {
+    // See datatypes: https://docs.quadrant.io/quadrant-data-dictionary
+
     internal class DataLoader
     {
         private string DataRoot { get; set; }
