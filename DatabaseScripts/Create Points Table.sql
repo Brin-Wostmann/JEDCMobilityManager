@@ -3,10 +3,10 @@ GO
 
 CREATE TABLE [dbo].[Point] (
     [TimeStamp] DATETIME NOT NULL,
-    [DeviceId] INT NOT NULL,
+    [DeviceId] VARCHAR(100) NOT NULL,
     [IdType] CHAR(4) NOT NULL,
-    [Latitude] DECIMAL(8,5) NOT NULL,
-    [Longitude] DECIMAL(8,5) NOT NULL,
+	[Latitude] DECIMAL(8,5) NOT NULL,
+	[Longitude] DECIMAL(8,5) NOT NULL,
     [HorizontalAccuracy] REAL NOT NULL,
     [IpAddress] VARCHAR(39) NOT NULL,
     [DeviceOS] VARCHAR(7) NOT NULL,
@@ -19,27 +19,26 @@ CREATE TABLE [dbo].[Point] (
     [LocationContext] VARCHAR(1) NOT NULL,
     [Geohash] CHAR(12) NOT NULL,
     [Consent] CHAR(1) NOT NULL,
-    [QuadId] CHAR(64) NOT NULL,
+    [PersonId] INT NOT NULL,
 )
 
 CREATE CLUSTERED COLUMNSTORE INDEX [CCI_Point]
 ON [dbo].[Point]
 GO
 
-CREATE TABLE [dbo].[Device] (
+CREATE TABLE [dbo].[Person] (
 	[Id] INT IDENTITY(1,1) PRIMARY KEY,
-	[DeviceId] VARCHAR(100) NOT NULL
+    [QuadId] CHAR(64) NOT NULL
 )
 GO
 
-ALTER TABLE [dbo].[Device]  
-ADD CONSTRAINT UQ_Device_DeviceId UNIQUE ([DeviceId])
+ALTER TABLE [dbo].[Person]  
+ADD CONSTRAINT [UQ_Person_QuadId] UNIQUE ([QuadId])
 GO
 
 ALTER TABLE [dbo].[Point] 
-ADD CONSTRAINT [FK_Point_Device] FOREIGN KEY ([DeviceId]) 
-REFERENCES [dbo].[Device] ([Id]) 
+ADD CONSTRAINT [FK_Point_Person] FOREIGN KEY ([PersonId]) 
+REFERENCES [dbo].[Person] ([Id]) 
 GO
-
 
 --ALTER INDEX [CCI_Point] ON [dbo].[Point] REBUILD
