@@ -28,7 +28,7 @@ INSERT INTO [dbo].[Person]
 SELECT DISTINCT I.[QuadId]
 FROM #Import I
 LEFT JOIN [dbo].[Person] P ON P.[QuadId] = I.[QuadId]
-WHERE D.[Id] IS NULL;
+WHERE P.[Id] IS NULL;
 
 INSERT INTO [dbo].[Point] ([TimeStamp],                     [DeviceId],     [IdType],   [Latitude],   [Longitude],   [HorizontalAccuracy],   [IpAddress],   [DeviceOS],   [OSVersion],   [UserAgent],   [Country],   [SourceId],   [PublisherId],   [AppId],   [LocationContext],   [Geohash],   [Consent], [PersonId])
 SELECT DATEADD(SECOND, I.[TimeStamp] / 1000, '1/1/1970'), I.[DeviceId],   I.[IdType], I.[Latitude], I.[Longitude], I.[HorizontalAccuracy], I.[IpAddress], I.[DeviceOS], I.[OSVersion], I.[UserAgent], I.[Country], I.[SourceId], I.[PublisherId], I.[AppId], I.[LocationContext], I.[Geohash], I.[Consent], P.[Id]
