@@ -42,3 +42,10 @@ REFERENCES [dbo].[Person] ([Id])
 GO
 
 --ALTER INDEX [CCI_Point] ON [dbo].[Point] REBUILD
+
+CREATE TABLE [dbo].[Area] (
+    [Id] INT IDENTITY(1,1) PRIMARY KEY,
+	[Name] VARCHAR(MAX) NOT NULL,
+    [Shape] GEOGRAPHY NOT NULL
+)
+GO
