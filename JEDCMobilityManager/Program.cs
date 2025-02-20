@@ -15,8 +15,9 @@ namespace JEDCMobilityManager
 
         public static void Main(string[] args)
         {
-            RunScript(new DataLoader(@"D:\JEDC Data\quadrant-io-mobility-data"));
-            RunScript(new ShapeLoader(@"D:\JEDC Data\DistrictBoundaries_WKT_WGS84_WKID4326.csv"));
+            //RunScript(new DataLoader(@"D:\JEDC Data\quadrant-io-mobility-data"));
+            //RunScript(new ShapeLoader(@"D:\JEDC Data\DistrictBoundaries_WKT_WGS84_WKID4326.csv"));
+            RunScript(new ShapeAnalyzer());
         }
 
         public static void RunScript(SqlScript script)
