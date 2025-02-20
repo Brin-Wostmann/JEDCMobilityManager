@@ -14,7 +14,6 @@ namespace JEDCMobilityManager
         public override void Start(string connection)
         {
             var loadAreaTask = Task.Run(() => LoadAreas(connection));
-            loadAreaTask.Start();
 
             PaManager = new PersonAreaManager(connection);
             PaManager.LoadExisting();
@@ -28,11 +27,14 @@ namespace JEDCMobilityManager
 
         private void RunPoints(IEnumerable<Tuple<int, Point>> data)
         {
-            Parallel.ForEach(Batch(data, 10000), ProcesBatch);
+            Parallel.ForEach(Batch(data, 100000), ProcesBatch);
+            //foreach (var list in Batch(data, 100000))
+            //    ProcesBatch(list);
 
             IEnumerable<IList<T>> Batch<T>(IEnumerable<T> items, int size)
             {
                 using var enumerator = items.GetEnumerator();
+                var processed = 0;
                 while (true)
                 {
                     var batch = new List<T>(size);
@@ -44,6 +46,8 @@ namespace JEDCMobilityManager
                         PaManager.Flush();
                         yield break;
                     }
+                    processed += size;
+                    Console.WriteLine(processed);
                     Task.Run(PaManager.Flush);
                     yield return batch;
                 }
@@ -84,7 +88,7 @@ namespace JEDCMobilityManager
 
                 using (var reader = cmd.ExecuteReader())
                     while (reader.Read())
-                        yield return Tuple.Create(reader.GetInt32(0), new Point(reader.GetDouble(2), reader.GetDouble(1)));
+                        yield return Tuple.Create(reader.GetInt32(0), new Point((double) reader.GetDecimal(2), (double) reader.GetDecimal(1)));
 
                 sql.Close();
             }
@@ -170,16 +174,19 @@ namespace JEDCMobilityManager
 
             public void Add(int personId, int areaId)
             {
-                if (!PersonAreas.TryGetValue(personId, out var areas))
+                lock (PersonAreas)
                 {
-                    areas = new List<int>();
-                    PersonAreas[personId] = areas;
-                }
+                    if (!PersonAreas.TryGetValue(personId, out var areas))
+                    {
+                        areas = new List<int>();
+                        PersonAreas[personId] = areas;
+                    }
 
-                if (!areas.Contains(areaId))
-                {
-                    areas.Add(areaId);
-                    Inserts.Add(Tuple.Create(personId, areaId));
+                    if (!areas.Contains(areaId))
+                    {
+                        areas.Add(areaId);
+                        Inserts.Add(Tuple.Create(personId, areaId));
+                    }
                 }
             }
 
@@ -195,7 +202,7 @@ namespace JEDCMobilityManager
                     Sql.Open();
 
                     using (var transaction = Sql.BeginTransaction())
-                    using (var cmd = new SqlCommand("INSERT INTO [dbo].[PersonArea] ([PersonId], [AreaId]) VALUES @personId, @areaId", Sql, transaction))
+                    using (var cmd = new SqlCommand("INSERT INTO [dbo].[PersonArea] ([PersonId], [AreaId]) VALUES (@personId, @areaId)", Sql, transaction))
                     {
                         var personId = cmd.Parameters.Add("@personId", SqlDbType.Int);
                         var areaId = cmd.Parameters.Add("@areaId", SqlDbType.Int);
