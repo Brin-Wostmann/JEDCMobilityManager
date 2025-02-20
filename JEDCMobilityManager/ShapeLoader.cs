@@ -5,27 +5,18 @@ using Microsoft.Data.SqlClient;
 
 namespace JEDCMobilityManager
 {
-    internal class ShapeLoader
+    internal class ShapeLoader : SqlScript
     {
         private string ShapeFile { get; set; }
-        public SqlConnectionStringBuilder Connection { get; set; }
 
         public ShapeLoader(string shapeFile)
         {
             ShapeFile = shapeFile;
-            Connection = new SqlConnectionStringBuilder {
-                DataSource = "localhost",
-                InitialCatalog = "JEDCMobility",
-                IntegratedSecurity = true,
-                TrustServerCertificate = true,
-                ConnectTimeout = 0,
-                CommandTimeout = 0
-            };
         }
 
-        public void Start()
+        public override void Start(string connection)
         {
-            using (var sql = new SqlConnection(Connection.ToString()))
+            using (var sql = new SqlConnection(connection))
             {
                 sql.Open();
                 using (var transation = sql.BeginTransaction())

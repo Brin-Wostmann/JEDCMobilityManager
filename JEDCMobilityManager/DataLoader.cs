@@ -7,13 +7,12 @@ namespace JEDCMobilityManager
 {
     // See datatypes: https://docs.quadrant.io/quadrant-data-dictionary
 
-    internal class DataLoader
+    internal class DataLoader : SqlScript
     {
         private string DataRoot { get; set; }
         private string HeaderCommand { get; set; }
         private string BodyCommand { get; set; }
         private string FooterCommand { get; set; }
-        public SqlConnectionStringBuilder Connection { get; set; }
 
         public DataLoader(string dataRoot)
         {
@@ -21,19 +20,11 @@ namespace JEDCMobilityManager
             HeaderCommand = File.ReadAllText(@"DataLoaderScripts\Header.sql");
             BodyCommand = File.ReadAllText(@"DataLoaderScripts\Body.sql");
             FooterCommand = File.ReadAllText(@"DataLoaderScripts\Footer.sql");
-            Connection = new SqlConnectionStringBuilder {
-                DataSource = "localhost",
-                InitialCatalog = "JEDCMobility",
-                IntegratedSecurity = true,
-                TrustServerCertificate = true,
-                ConnectTimeout = 0,
-                CommandTimeout = 0
-            };
         }
 
-        public void Start()
+        public override void Start(string connection)
         {
-            using (var sql = new SqlConnection(Connection.ToString()))
+            using (var sql = new SqlConnection(connection))
             {
                 sql.Open();
                 ExecuteCommand(sql, HeaderCommand);
