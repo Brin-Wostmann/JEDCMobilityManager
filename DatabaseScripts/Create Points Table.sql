@@ -49,3 +49,9 @@ CREATE TABLE [dbo].[Area] (
     [Shape] GEOGRAPHY NOT NULL
 )
 GO
+
+CREATE TABLE [dbo].[PersonArea] (
+	[PersonId] INT NOT NULL,
+	[AreaId] INT NOT NULL
+)
+GO

@@ -1,80 +1,56 @@
-﻿using System.Data;
+﻿using System.Collections.Concurrent;
+using System.Data;
+using JEDCMobilityManager.Utility;
 using Microsoft.Data.SqlClient;
 using NetTopologySuite.Geometries;
-using NetTopologySuite.IO;
 
 namespace JEDCMobilityManager
 {
     internal class ShapeAnalyzer : SqlScript
     {
-        private IList<Area> Areas { get; set; } = new List<Area>();
-        private Envelope Envelope { get; } = new Envelope();
-        private PersonAreaManager PaManager { get; set; } = null!;
+        private IList<Area> Areas { get; set; } = null!;
+        private Envelope Envelope { get; set; } = null!;
+        private ConcurrentQueue<Tuple<int, int>> ResultQueue { get; set; } = null!;
+        private SemaphoreSlim ResultQueueSemaphore { get; set; } = null!;
+        private bool FinishedPoints { get; set; }
 
         public override void Start(string connection)
         {
-            var loadAreaTask = Task.Run(() => LoadAreas(connection));
-
-            PaManager = new PersonAreaManager(connection);
-            PaManager.LoadExisting();
-
-            loadAreaTask.Wait();
-
+            FinishedPoints = false;
+            ResultQueue = new ConcurrentQueue<Tuple<int, int>>();
+            ResultQueueSemaphore = new SemaphoreSlim(0);
+            Areas = Area.GetAll(connection);
+            Envelope = Areas.FindIntersections();
+            var resultsTask = Task.Run(() => ProcessResults(connection));
             RunPoints(EnumeratePoints(connection));
-
-            PaManager.Dispose();
+            FinishedPoints = true;
+            ResultQueueSemaphore.Release();
+            resultsTask.Wait();
         }
 
-        private void RunPoints(IEnumerable<Tuple<int, Point>> data)
+        private void RunPoints(IEnumerable<Tuple<int, Point>> points)
         {
-            Parallel.ForEach(Batch(data, 100000), ProcesBatch);
-            //foreach (var list in Batch(data, 100000))
-            //    ProcesBatch(list);
-
-            IEnumerable<IList<T>> Batch<T>(IEnumerable<T> items, int size)
+            var count = 0;
+            foreach (var point in points)
             {
-                using var enumerator = items.GetEnumerator();
-                var processed = 0;
-                while (true)
+                if (++count % 100000 == 0)
+                    Console.WriteLine(count);
+
+                if (!Envelope.Contains(point.Item2.Coordinate)) continue;
+                foreach (var area in Areas)
                 {
-                    var batch = new List<T>(size);
-                    lock (enumerator)
-                        for (int i = 0; i < size && enumerator.MoveNext(); i++)
-                            batch.Add(enumerator.Current);
-                    if (batch.Count == 0)
-                    {
-                        PaManager.Flush();
-                        yield break;
-                    }
-                    processed += size;
-                    Console.WriteLine(processed);
-                    Task.Run(PaManager.Flush);
-                    yield return batch;
+                    if (!TestContains(area)) continue;
+                    foreach (var areaIntersect in area.Intersects)
+                        TestContains(areaIntersect);
+                    break;
                 }
-            }
 
-            void ProcesBatch(IEnumerable<Tuple<int, Point>> points)
-            {
-                foreach (var point in points)
+                bool TestContains(Area area)
                 {
-                    if (!Envelope.Contains(point.Item2.Coordinate)) continue;
-                    var knownAreas = PaManager.GetPerson(point.Item1);
-                    foreach (var area in Areas)
-                    {
-                        if (!TestContains(area)) continue;
-                        foreach (var areaIntersect in area.Intersects)
-                            TestContains(areaIntersect);
-                        break;
-                    }
-
-                    bool TestContains(Area area)
-                    {
-                        if (knownAreas.Contains(area.Id)) return false;
-                        if (!area.Envelope.Contains(point.Item2.Coordinate)) return false;
-                        if (!area.Geometry.Contains(point.Item2)) return false;
-                        PaManager.Add(point.Item1, area.Id);
-                        return true;
-                    }
+                    if (!area.Envelope.Contains(point.Item2.Coordinate)) return false;
+                    if (!area.Geometry.Contains(point.Item2)) return false;
+                    EnqueueResult(point.Item1, area.Id);
+                    return true;
                 }
             }
         }
@@ -94,136 +70,42 @@ namespace JEDCMobilityManager
             }
         }
 
-        private void LoadAreas(string connection)
+        public void EnqueueResult(int personId, int areaId)
         {
+            ResultQueue.Enqueue(Tuple.Create(personId, areaId));
+            ResultQueueSemaphore.Release();
+        }
+
+        public async Task ProcessResults(string connection)
+        {
+            const string command =
+                @"IF NOT EXISTS (
+                    SELECT 1 
+                    FROM [dbo].[PersonArea] 
+                    WHERE [PersonId] = @personId AND [AreaId] = @areaId
+                )
+                BEGIN
+                    INSERT INTO [dbo].[PersonArea] ([PersonId], [AreaId]) 
+                    VALUES (@personId, @areaId)
+                END";
+
             using (var sql = new SqlConnection(connection))
+            using (var cmd = new SqlCommand(command, sql))
             {
+                var personId = cmd.Parameters.Add("@personId", SqlDbType.Int);
+                var areaId = cmd.Parameters.Add("@areaId", SqlDbType.Int);
                 sql.Open();
-
-                using (var cmd = new SqlCommand("SELECT [Id], [Shape].STAsText() FROM [dbo].[Area]", sql))
-                using (var reader = cmd.ExecuteReader())
-                    while (reader.Read())
-                        Areas.Add(new Area(reader.GetInt32(0), reader.GetString(1)));
-
+                while (!FinishedPoints || !ResultQueue.IsEmpty)
+                {
+                    await ResultQueueSemaphore.WaitAsync();
+                    if (ResultQueue.TryDequeue(out var item))
+                    {
+                        personId.Value = item.Item1;
+                        areaId.Value = item.Item2;
+                        cmd.ExecuteNonQuery();
+                    }
+                }
                 sql.Close();
-            }
-
-            for (var i = 0; i < Areas.Count; i++)
-            {
-                var areaA = Areas[i];
-                Envelope.ExpandToInclude(areaA.Envelope);
-                for (var j = i + 1; j < Areas.Count; j++)
-                {
-                    var areaB = Areas[j];
-                    if (areaA.Geometry.Intersects(areaB.Geometry))
-                    {
-                        areaA.Intersects.Add(areaB);
-                        areaB.Intersects.Add(areaA);
-                    }
-                }
-            }
-        }
-
-        private class Area
-        {
-            private static WKTReader Reader { get; } = new WKTReader();
-
-            public int Id { get; }
-            //public string WktShape { get; }
-            public Geometry Geometry { get; }
-            public Envelope Envelope { get; }
-            public IList<Area> Intersects { get; } = new List<Area>();
-
-            public Area(int id, string shape)
-            {
-                Id = id;
-                //WktShape = shape;
-                Geometry = Reader.Read(shape);
-                Envelope = Geometry.EnvelopeInternal;
-            }
-        }
-
-        private class PersonAreaManager : IDisposable
-        {
-            private SqlConnection Sql { get; }
-            private IDictionary<int, IList<int>> PersonAreas { get; } = new Dictionary<int, IList<int>>();
-            private IList<Tuple<int, int>> Inserts { get; set; } = new List<Tuple<int, int>>();
-
-            public PersonAreaManager(string connection)
-            {
-                Sql = new SqlConnection(connection);
-            }
-
-            public void LoadExisting()
-            {
-                Sql.Open();
-
-                using (var cmd = new SqlCommand("SELECT [PersonId], [AreaId] FROM [dbo].[PersonArea]", Sql))
-                using (var reader = cmd.ExecuteReader())
-                    while (reader.Read())
-                        Add(reader.GetInt32(0), reader.GetInt32(1));
-
-                Sql.Close();
-                Inserts = new List<Tuple<int, int>>();
-            }
-
-            public IList<int> GetPerson(int personId)
-            {
-                return PersonAreas.TryGetValue(personId, out var areas) ? areas : new List<int>();
-            }
-
-            public void Add(int personId, int areaId)
-            {
-                lock (PersonAreas)
-                {
-                    if (!PersonAreas.TryGetValue(personId, out var areas))
-                    {
-                        areas = new List<int>();
-                        PersonAreas[personId] = areas;
-                    }
-
-                    if (!areas.Contains(areaId))
-                    {
-                        areas.Add(areaId);
-                        Inserts.Add(Tuple.Create(personId, areaId));
-                    }
-                }
-            }
-
-            public void Flush()
-            {
-                if (!Inserts.Any()) return;
-
-                lock (Sql)
-                {
-                    var inserts = Inserts;
-                    Inserts = new List<Tuple<int, int>>();
-
-                    Sql.Open();
-
-                    using (var transaction = Sql.BeginTransaction())
-                    using (var cmd = new SqlCommand("INSERT INTO [dbo].[PersonArea] ([PersonId], [AreaId]) VALUES (@personId, @areaId)", Sql, transaction))
-                    {
-                        var personId = cmd.Parameters.Add("@personId", SqlDbType.Int);
-                        var areaId = cmd.Parameters.Add("@areaId", SqlDbType.Int);
-
-                        foreach (var insert in inserts)
-                        {
-                            personId.Value = insert.Item1;
-                            areaId.Value = insert.Item2;
-                            cmd.ExecuteNonQuery();
-                        }
-
-                        transaction.Commit();
-                    }
-
-                    Sql.Close();
-                }
-            }
-
-            public void Dispose()
-            {
-                Sql.Dispose();
             }
         }
     }
