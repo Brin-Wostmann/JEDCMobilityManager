@@ -30,27 +30,55 @@ namespace JEDCMobilityManager
 
         private void RunPoints(IEnumerable<Tuple<int, Point>> points)
         {
-            var count = 0;
-            foreach (var point in points)
+            var maxThreads = Environment.ProcessorCount;
+            var chunkQueue = new ConcurrentQueue<IEnumerable<Tuple<int, Point>>>();
+            var chunkSignal = new SemaphoreSlim(0);
+            var capacitySignal = new SemaphoreSlim(maxThreads * 10, maxThreads * 10);
+            var done = false;
+            var pointTasks = new Task[maxThreads];
+            for (var i = 0; i < maxThreads; i++)
+                pointTasks[i] = Task.Run(() => PointTask());
+
+            foreach (var chunk in points.Partition(10000))
             {
-                if (++count % 100000 == 0)
-                    Console.WriteLine(count);
+                capacitySignal.Wait();
+                chunkQueue.Enqueue(chunk.ToList());
+                chunkSignal.Release();
+            }
 
-                if (!Envelope.Contains(point.Item2.Coordinate)) continue;
-                foreach (var area in Areas)
-                {
-                    if (!TestContains(area)) continue;
-                    foreach (var areaIntersect in area.Intersects)
-                        TestContains(areaIntersect);
-                    break;
-                }
+            done = true;
+            chunkSignal.Release(maxThreads);
+            Task.WaitAll(pointTasks);
 
-                bool TestContains(Area area)
+            void PointTask()
+            {
+                // ReSharper disable once AccessToModifiedClosure
+                while (!done || !chunkQueue.IsEmpty)
                 {
-                    if (!area.Envelope.Contains(point.Item2.Coordinate)) return false;
-                    if (!area.Geometry.Contains(point.Item2)) return false;
-                    EnqueueResult(point.Item1, area.Id);
-                    return true;
+                    chunkSignal.Wait();
+                    capacitySignal.Release();
+                    if (!chunkQueue.TryDequeue(out var chunk))
+                        continue;
+
+                    foreach (var point in chunk)
+                    {
+                        if (!Envelope.Contains(point.Item2.Coordinate)) continue;
+                        foreach (var area in Areas)
+                        {
+                            if (!TestContains(area)) continue;
+                            foreach (var areaIntersect in area.Intersects)
+                                TestContains(areaIntersect);
+                            break;
+                        }
+
+                        bool TestContains(Area area)
+                        {
+                            if (!area.Envelope.Contains(point.Item2.Coordinate)) return false;
+                            if (!area.Geometry.Contains(point.Item2)) return false;
+                            EnqueueResult(point.Item1, area.Id);
+                            return true;
+                        }
+                    }
                 }
             }
         }
