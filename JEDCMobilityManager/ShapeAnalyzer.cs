@@ -10,22 +10,25 @@ namespace JEDCMobilityManager
     {
         private IList<Area> Areas { get; set; } = null!;
         private Envelope Envelope { get; set; } = null!;
-        private ConcurrentQueue<Tuple<int, int>> ResultQueue { get; set; } = null!;
-        private SemaphoreSlim ResultQueueSemaphore { get; set; } = null!;
-        private bool FinishedPoints { get; set; }
+        private ResultManager Results { get; set; } = null!;
 
         public override void Start(string connection)
         {
-            FinishedPoints = false;
-            ResultQueue = new ConcurrentQueue<Tuple<int, int>>();
-            ResultQueueSemaphore = new SemaphoreSlim(0);
+            Results = new ResultManager(connection);
+            // ReSharper disable once AccessToDisposedClosure
+            var rTask = Task.Run(() => Results.LoadExisting());
+
             Areas = Area.GetAll(connection);
             Envelope = Areas.FindIntersections();
-            var resultsTask = Task.Run(() => ProcessResults(connection));
+
+            rTask.Wait();
+            // ReSharper disable once AccessToDisposedClosure
+            rTask = Task.Run(() => Results.StartProcessing());
+
             RunPoints(EnumeratePoints(connection));
-            FinishedPoints = true;
-            ResultQueueSemaphore.Release();
-            resultsTask.Wait();
+            Results.StopProcessing();
+            rTask.Wait();
+            Results.Dispose();
         }
 
         private void RunPoints(IEnumerable<Tuple<int, Point>> points)
@@ -33,22 +36,25 @@ namespace JEDCMobilityManager
             var maxThreads = Environment.ProcessorCount;
             var chunkQueue = new ConcurrentQueue<IEnumerable<Tuple<int, Point>>>();
             var chunkSignal = new SemaphoreSlim(0);
-            var capacitySignal = new SemaphoreSlim(maxThreads * 10, maxThreads * 10);
+            var capacitySignal = new SemaphoreSlim(maxThreads * 3, maxThreads * 3);
             var done = false;
             var pointTasks = new Task[maxThreads];
             for (var i = 0; i < maxThreads; i++)
                 pointTasks[i] = Task.Run(() => PointTask());
 
-            foreach (var chunk in points.Partition(10000))
+            //var count = 0;
+            foreach (var chunk in points.Partition(100000))
             {
                 capacitySignal.Wait();
                 chunkQueue.Enqueue(chunk.ToList());
                 chunkSignal.Release();
+                //Console.WriteLine(++count * 100000);
             }
 
             done = true;
             chunkSignal.Release(maxThreads);
             Task.WaitAll(pointTasks);
+            //Console.WriteLine("All Points Processed");
 
             void PointTask()
             {
@@ -56,13 +62,14 @@ namespace JEDCMobilityManager
                 while (!done || !chunkQueue.IsEmpty)
                 {
                     chunkSignal.Wait();
-                    capacitySignal.Release();
+                    try { capacitySignal.Release(); }catch { /**/ }
                     if (!chunkQueue.TryDequeue(out var chunk))
                         continue;
 
                     foreach (var point in chunk)
                     {
                         if (!Envelope.Contains(point.Item2.Coordinate)) continue;
+                        var known = Results.GetKnown(point.Item1);
                         foreach (var area in Areas)
                         {
                             if (!TestContains(area)) continue;
@@ -73,9 +80,10 @@ namespace JEDCMobilityManager
 
                         bool TestContains(Area area)
                         {
+                            if (known.Contains(area.Id)) return false;
                             if (!area.Envelope.Contains(point.Item2.Coordinate)) return false;
                             if (!area.Geometry.Contains(point.Item2)) return false;
-                            EnqueueResult(point.Item1, area.Id);
+                            Results.Add(point.Item1, area.Id);
                             return true;
                         }
                     }
@@ -98,42 +106,85 @@ namespace JEDCMobilityManager
             }
         }
 
-        public void EnqueueResult(int personId, int areaId)
+        private class ResultManager : IDisposable
         {
-            ResultQueue.Enqueue(Tuple.Create(personId, areaId));
-            ResultQueueSemaphore.Release();
-        }
+            private SqlConnection Sql { get; }
+            private IDictionary<int, IList<int>> Known { get; } = new Dictionary<int, IList<int>>();
+            private ConcurrentQueue<Tuple<int, int>> Imports { get; } = new ConcurrentQueue<Tuple<int, int>>();
+            private SemaphoreSlim ImportSignal { get; set; } = new SemaphoreSlim(0);
+            private bool FinishProcessing { get; set; }
 
-        public async Task ProcessResults(string connection)
-        {
-            const string command =
-                @"IF NOT EXISTS (
-                    SELECT 1 
-                    FROM [dbo].[PersonArea] 
-                    WHERE [PersonId] = @personId AND [AreaId] = @areaId
-                )
-                BEGIN
-                    INSERT INTO [dbo].[PersonArea] ([PersonId], [AreaId]) 
-                    VALUES (@personId, @areaId)
-                END";
-
-            using (var sql = new SqlConnection(connection))
-            using (var cmd = new SqlCommand(command, sql))
+            public ResultManager(string connection)
             {
-                var personId = cmd.Parameters.Add("@personId", SqlDbType.Int);
-                var areaId = cmd.Parameters.Add("@areaId", SqlDbType.Int);
-                sql.Open();
-                while (!FinishedPoints || !ResultQueue.IsEmpty)
+                Sql = new SqlConnection(connection);
+            }
+
+            public void LoadExisting()
+            {
+                Sql.Open();
+                using (var cmd = new SqlCommand("SELECT [PersonId], [AreaId] FROM [dbo].[PersonArea]", Sql))
+                using (var reader = cmd.ExecuteReader())
+                    while (reader.Read())
+                        Add(reader.GetInt32(0), reader.GetInt32(1));
+                Sql.Close();
+                Imports.Clear();
+                ImportSignal = new SemaphoreSlim(0);
+            }
+
+            public IList<int> GetKnown(int personId)
+            {
+                return Known.TryGetValue(personId, out var areas) ? areas : new List<int>();
+            }
+
+            public void Add(int personId, int areaId)
+            {
+                lock (Known)
                 {
-                    await ResultQueueSemaphore.WaitAsync();
-                    if (ResultQueue.TryDequeue(out var item))
+                    if (!Known.TryGetValue(personId, out var areas))
                     {
-                        personId.Value = item.Item1;
-                        areaId.Value = item.Item2;
-                        cmd.ExecuteNonQuery();
+                        areas = new List<int>();
+                        Known.Add(personId, areas);
                     }
+                    if (areas.Contains(areaId)) return;
+                    areas.Add(areaId);
+                    Imports.Enqueue(Tuple.Create(personId, areaId));
+                    ImportSignal.Release();
                 }
-                sql.Close();
+            }
+
+            public void StopProcessing()
+            {
+                FinishProcessing = true;
+                ImportSignal.Release();
+            }
+
+            public async Task StartProcessing()
+            {
+                FinishProcessing = false;
+                Sql.Open();
+                using (var transation = Sql.BeginTransaction())
+                using (var cmd = new SqlCommand("INSERT INTO [dbo].[PersonArea] ([PersonId], [AreaId]) VALUES (@personId, @areaId)", Sql, transation))
+                {
+                    var personId = cmd.Parameters.Add("@personId", SqlDbType.Int);
+                    var areaId = cmd.Parameters.Add("@areaId", SqlDbType.Int);
+                    while (!FinishProcessing || !Imports.IsEmpty)
+                    {
+                        await ImportSignal.WaitAsync();
+                        if (Imports.TryDequeue(out var item))
+                        {
+                            personId.Value = item.Item1;
+                            areaId.Value = item.Item2;
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+                    transation.Commit();
+                }
+                Sql.Close();
+            }
+
+            public void Dispose()
+            {
+                Sql.Dispose();
             }
         }
     }
