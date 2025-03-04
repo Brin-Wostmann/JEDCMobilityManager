@@ -29,7 +29,8 @@ GO
 CREATE TABLE [dbo].[Person] (
 	[Id] INT IDENTITY(1,1) PRIMARY KEY,
     [QuadId] CHAR(64) NOT NULL,
-	[HoursSpan] INT NULL
+	[HoursSpan] INT NULL,
+	[IsResident] AS (CASE WHEN [HoursSpan] > 12 THEN 1 ELSE 0 END)
 )
 GO
 
