@@ -55,3 +55,16 @@ CREATE TABLE [dbo].[PersonArea] (
 	[AreaId] INT NOT NULL
 )
 GO
+
+ALTER TABLE [dbo].[PersonArea]  
+ADD CONSTRAINT [UQ_PersonArea] UNIQUE ([PersonId], [AreaId])
+
+ALTER TABLE [dbo].[PersonArea] 
+ADD CONSTRAINT [FK_PersonArea_Person] FOREIGN KEY ([PersonId]) 
+REFERENCES [dbo].[Person] ([Id]) 
+
+ALTER TABLE [dbo].[PersonArea] 
+ADD CONSTRAINT [FK_PersonArea_Area] FOREIGN KEY ([AreaId]) 
+REFERENCES [dbo].[Area] ([Id]) 
+GO
+
