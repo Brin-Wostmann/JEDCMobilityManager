@@ -28,7 +28,8 @@ GO
 
 CREATE TABLE [dbo].[Person] (
 	[Id] INT IDENTITY(1,1) PRIMARY KEY,
-    [QuadId] CHAR(64) NOT NULL
+    [QuadId] CHAR(64) NOT NULL,
+	[HoursSpan] INT NULL
 )
 GO
 
@@ -40,8 +41,6 @@ ALTER TABLE [dbo].[Point]
 ADD CONSTRAINT [FK_Point_Person] FOREIGN KEY ([PersonId]) 
 REFERENCES [dbo].[Person] ([Id]) 
 GO
-
---ALTER INDEX [CCI_Point] ON [dbo].[Point] REBUILD
 
 CREATE TABLE [dbo].[Area] (
     [Id] INT IDENTITY(1,1) PRIMARY KEY,
