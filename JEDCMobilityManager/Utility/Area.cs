@@ -10,14 +10,16 @@ namespace JEDCMobilityManager.Utility
         private static GeoJsonWriter Writer { get; } = new GeoJsonWriter();
 
         public int Id { get; }
+        public string Name { get; }
         public Geometry Geometry { get; }
         public Envelope Envelope { get; }
         public IList<Area> Intersects { get; } = new List<Area>();
         public string GeoJson { get; }
 
-        public Area(int id, string shape)
+        public Area(int id, string name, string shape)
         {
             Id = id;
+            Name = name;
             Geometry = Reader.Read(shape);
             Envelope = Geometry.EnvelopeInternal;
             GeoJson = Writer.Write(Geometry);
@@ -30,10 +32,10 @@ namespace JEDCMobilityManager.Utility
             {
                 sql.Open();
 
-                using (var cmd = new SqlCommand("SELECT [Id], [Shape].STAsText() FROM [dbo].[Area]", sql))
+                using (var cmd = new SqlCommand("SELECT [Id], [Name], [Shape].STAsText() FROM [dbo].[Area]", sql))
                 using (var reader = cmd.ExecuteReader())
                     while (reader.Read())
-                        areas.Add(new Area(reader.GetInt32(0), reader.GetString(1)));
+                        areas.Add(new Area(reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
 
                 sql.Close();
             }
