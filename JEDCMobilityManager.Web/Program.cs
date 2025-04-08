@@ -1,9 +1,21 @@
+using JEDCMobilityManager.Web.Controllers;
+using Microsoft.Data.SqlClient;
+
 namespace JEDCMobilityManager.Web
 {
     public class Program
     {
         public static void Main(string[] args)
         {
+            BaseController.Connection = new SqlConnectionStringBuilder {
+                DataSource = "localhost",
+                InitialCatalog = "JEDCMobility",
+                IntegratedSecurity = true,
+                TrustServerCertificate = true,
+                ConnectTimeout = 0,
+                CommandTimeout = 0
+            }.ToString();
+
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.

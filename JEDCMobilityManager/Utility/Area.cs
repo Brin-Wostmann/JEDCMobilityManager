@@ -4,20 +4,23 @@ using Microsoft.Data.SqlClient;
 
 namespace JEDCMobilityManager.Utility
 {
-    internal class Area
+    public class Area
     {
         private static WKTReader Reader { get; } = new WKTReader();
+        private static GeoJsonWriter Writer { get; } = new GeoJsonWriter();
 
         public int Id { get; }
         public Geometry Geometry { get; }
         public Envelope Envelope { get; }
         public IList<Area> Intersects { get; } = new List<Area>();
+        public string GeoJson { get; }
 
         public Area(int id, string shape)
         {
             Id = id;
             Geometry = Reader.Read(shape);
             Envelope = Geometry.EnvelopeInternal;
+            GeoJson = Writer.Write(Geometry);
         }
 
         public static IList<Area> GetAll(string connection)

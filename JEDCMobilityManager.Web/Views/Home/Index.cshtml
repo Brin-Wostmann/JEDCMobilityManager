@@ -1,4 +1,5 @@
-﻿@{
+﻿@model IList<JEDCMobilityManager.Utility.Area>
+@{
     ViewData["Title"] = "Home Page";
 }
 
@@ -8,23 +9,20 @@
     <script>
         customElements.define("x-map", (function (proto) {
             constructor.prototype = Object.create(proto.prototype, {
+                latitude: { get: function () { return parseFloat(this.getAttribute("latitude")) || 0; } },
+                longitude: { get: function () { return parseFloat(this.getAttribute("longitude")) || 0; } },
+                zoom: { get: function(){ return parseFloat(this.getAttribute("zoom")) || 5; } },
                 constructor: { value: constructor },
                 connectedCallback: { value: function () {
-                    var lat = parseFloat(this.getAttribute("latitude")) || 0;
-                    var lon = parseFloat(this.getAttribute("longitude")) || 0;
-                    var zoom = parseFloat(this.getAttribute("zoom")) || 5;
-
                     this.map = new maplibregl.Map({
                         container: this,
                         style: "https://demotiles.maplibre.org/style.json",
-                        center: [lon, lat],
-                        zoom: zoom
+                        center: [this.longitude, this.latitude],
+                        zoom: this.zoom
                     });
-
                     this.map.addControl(new maplibregl.NavigationControl());
                 } }
             });
-
             return constructor;
 
             function constructor() {
@@ -34,7 +32,13 @@
     </script>
 }
 
-Test
+<x-map style="height: 500px; width: 500px; resize: both;  display: block;" latitude="58.3005" longitude="-134.4201" zoom="14"></x-map>
 
-<x-map latitude="40" longitude="-74.5" zoom="9"></x-map>
-
+<div>
+    @foreach (var area in Model)
+    {
+        <div>
+            @area.GeoJson
+        </div>
+    }
+</div>
