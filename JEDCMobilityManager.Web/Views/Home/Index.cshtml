@@ -26,20 +26,36 @@
                 }.bind(this));
             }
             switchLayer(name) {
-                console.log(name);
+                this.map.addSource(name, {
+                    type: "geojson",
+                    data: this.layers[name]
+                });
+                this.map.addLayer({
+                    id: name,
+                    type: "fill",
+                    source: name,
+                    layout: {},
+                    paint: {
+                        "fill-color": "#088",
+                        "fill-opacity": 0.5
+                    }
+                });
+                this.map.addLayer({
+                    id: name + "-outline",
+                    type: "line",
+                    source: name,
+                    layout: {},
+                    paint: {
+                        "line-color": "#000",
+                        "line-width": 2
+                    }
+                });
             }
             #readChildData() {
-                return this.querySelectorAll("template[type=geojson]").reduce(function (_, template) {
-                    const name = template.getAttribute("name");
-                    this.layers[name] = {
-                        title: template.content.querySelector("caption").textContent,
-                        areas: template.content.querySelectorAll("tr").map(function (area) {
-                            return {
-                                name: area.querySelector("th").textContent,
-                                data: area.querySelector("td").textContent
-                            };
-                        })
-                    };
+                return this.querySelectorAll("script[type='text/geojson']").reduce(function (name, script) {
+                    name = script.getAttribute("name");
+                    this.layers[name] = JSON.parse(script.textContent);
+                    script.remove();
                     return name;
                 }.bind(this), null);
             }
@@ -47,15 +63,13 @@
     </script>
 }
 
-<x-map style="height: 500px; width: 500px; resize: both;  display: block;" latitude="58.3005" longitude="-134.4201" zoom="14">
-    <template type="geojson" name="RD">
-        <caption>Ranger Districts</caption>
-        @foreach (var area in Model)
-        {
-            <tr>
-                <th>@area.Name</th>
-                <td>@area.GeoJson</td>
-            </tr>
-        }
-    </template>
+<x-map style="height: 700px; width: 700px; resize: both;  display: block;" latitude="58.3005" longitude="-134.4201" zoom="5">
+    <script type="text/geojson" name="RD" title="Ranger Districts"> {
+        "type": "FeatureCollection",
+        "features": [ @Html.Raw(string.Join(',', Model.Select(feature => $@"{{
+            ""type"": ""Feature"",
+            ""properties"": {{ ""name"": ""{feature.Name}"" }},
+            ""geometry"": {feature.GeoJson}
+        }}"))) ]
+    } </script>
 </x-map>
