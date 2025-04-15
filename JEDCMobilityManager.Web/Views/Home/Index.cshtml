@@ -1,4 +1,4 @@
-﻿@model IList<JEDCMobilityManager.Utility.Area>
+﻿@model Tuple<string>
 @{
     ViewData["Title"] = "Home Page";
 }
@@ -64,12 +64,7 @@
 }
 
 <x-map style="height: 700px; width: 700px; resize: both;  display: block;" latitude="58.3005" longitude="-134.4201" zoom="5">
-    <script type="text/geojson" name="RD" title="Ranger Districts"> {
-        "type": "FeatureCollection",
-        "features": [ @Html.Raw(string.Join(',', Model.Select(feature => $@"{{
-            ""type"": ""Feature"",
-            ""properties"": {{ ""name"": ""{feature.Name}"" }},
-            ""geometry"": {feature.GeoJson}
-        }}"))) ]
-    } </script>
+    <script type="text/geojson" name="RD" title="Ranger Districts">
+        @Html.Raw(Model.Item1)
+    </script>
 </x-map>

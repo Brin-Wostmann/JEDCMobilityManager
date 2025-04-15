@@ -7,20 +7,21 @@ namespace JEDCMobilityManager.Web.Controllers
     {
         public IActionResult Index()
         {
-            return View(Area.GetAll(Connection));
+            return View(Tuple.Create(Features("RD")));
         }
 
         public string Features(string name)
         {
-            return string.Format("{{ \"type\": \"FeatureCollection\", \"features\": [{0}] }}", string.Join(',', Area.GetAll(Connection, FeatureQuery).Select(feature => $@"{{
-                ""type"": ""Feature"",
-                ""properties"": {{
-                    ""name"": ""{feature.Name}"",
-                    ""visitors"": {feature.OtherValues["Visitors"]},
-                    ""residents"": {feature.OtherValues["Residents"]}
-                }},
-                ""geometry"": {feature.GeoJson}
-            }}")));
+            return string.Format("{{ \"type\": \"FeatureCollection\", \"features\": [{0}] }}",
+                string.Join(',', Area.GetAll(Connection, FeatureQuery).Select(feature => $@"{{
+                    ""type"": ""Feature"",
+                    ""properties"": {{
+                        ""name"": ""{feature.Name}"",
+                        ""visitors"": {feature.OtherValues["Visitors"]},
+                        ""residents"": {feature.OtherValues["Residents"]}
+                    }},
+                    ""geometry"": {feature.GeoJson}
+                }}")));
         }
 
         private const string FeatureQuery = @"
