@@ -15,27 +15,29 @@ namespace JEDCMobilityManager.Utility
         public Envelope Envelope { get; }
         public IList<Area> Intersects { get; } = new List<Area>();
         public string GeoJson { get; }
+        public IDictionary<string, object> OtherValues { get; }
 
-        public Area(int id, string name, string shape)
+        public Area(int id, string name, string shape, IDictionary<string, object> otherValues)
         {
             Id = id;
             Name = name;
             Geometry = Reader.Read(shape);
             Envelope = Geometry.EnvelopeInternal;
             GeoJson = Writer.Write(Geometry);
+            OtherValues = otherValues;
         }
 
-        public static IList<Area> GetAll(string connection)
+        public static IList<Area> GetAll(string connection, string? command = null)
         {
             var areas = new List<Area>();
             using (var sql = new SqlConnection(connection))
             {
                 sql.Open();
 
-                using (var cmd = new SqlCommand("SELECT [Id], [Name], [Shape].STAsText() FROM [dbo].[Area]", sql))
+                using (var cmd = new SqlCommand(command ?? "SELECT [Id], [Name], [Shape].STAsText() FROM [dbo].[Area]", sql))
                 using (var reader = cmd.ExecuteReader())
                     while (reader.Read())
-                        areas.Add(new Area(reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
+                        areas.Add(new Area(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.ToDictionary()));
 
                 sql.Close();
             }
