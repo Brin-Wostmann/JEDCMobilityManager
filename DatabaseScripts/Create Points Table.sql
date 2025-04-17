@@ -70,3 +70,14 @@ ADD CONSTRAINT [FK_PersonArea_Area] FOREIGN KEY ([AreaId])
 REFERENCES [dbo].[Area] ([Id]) 
 GO
 
+CREATE VIEW [dbo].[vw_PersonArea_All] AS
+SELECT DISTINCT [PersonId], [AreaId]
+FROM [dbo].[PersonArea] PA
+
+CREATE VIEW [dbo].[vw_PersonArea_Daily] AS
+SELECT DISTINCT [PersonId], [AreaId], [Date]
+FROM [dbo].[PersonArea] PA
+
+CREATE VIEW [dbo].[vw_PersonArea_Hourly] AS
+SELECT DISTINCT [PersonId], [AreaId], [Date], [Hour]
+FROM [dbo].[PersonArea] PA
