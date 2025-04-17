@@ -31,10 +31,10 @@ namespace JEDCMobilityManager
             Results.Dispose();
         }
 
-        private void RunPoints(IEnumerable<Tuple<int, Point>> points)
+        private void RunPoints(IEnumerable<Tuple<int, Point, DateTime>> points)
         {
             var maxThreads = Environment.ProcessorCount;
-            var chunkQueue = new ConcurrentQueue<IEnumerable<Tuple<int, Point>>>();
+            var chunkQueue = new ConcurrentQueue<IEnumerable<Tuple<int, Point, DateTime>>>();
             var chunkSignal = new SemaphoreSlim(0);
             var capacitySignal = new SemaphoreSlim(maxThreads * 3, maxThreads * 3);
             var done = false;
@@ -42,19 +42,19 @@ namespace JEDCMobilityManager
             for (var i = 0; i < maxThreads; i++)
                 pointTasks[i] = Task.Run(() => PointTask());
 
-            //var count = 0;
+            var count = 0;
             foreach (var chunk in points.Partition(100000))
             {
                 capacitySignal.Wait();
                 chunkQueue.Enqueue(chunk.ToList());
                 chunkSignal.Release();
-                //Console.WriteLine(++count * 100000);
+                Console.WriteLine(++count * 100000);
             }
 
             done = true;
             chunkSignal.Release(maxThreads);
             Task.WaitAll(pointTasks);
-            //Console.WriteLine("All Points Processed");
+            Console.WriteLine("All Points Processed");
 
             void PointTask()
             {
@@ -69,7 +69,7 @@ namespace JEDCMobilityManager
                     foreach (var point in chunk)
                     {
                         if (!Envelope.Contains(point.Item2.Coordinate)) continue;
-                        var known = Results.GetKnown(point.Item1);
+                        var known = Results.GetKnown(point.Item1, point.Item3);
                         foreach (var area in Areas)
                         {
                             if (!TestContains(area)) continue;
@@ -83,7 +83,7 @@ namespace JEDCMobilityManager
                             if (known.Contains(area.Id)) return false;
                             if (!area.Envelope.Contains(point.Item2.Coordinate)) return false;
                             if (!area.Geometry.Contains(point.Item2)) return false;
-                            Results.Add(point.Item1, area.Id);
+                            Results.Add(point.Item1, area.Id, point.Item3);
                             return true;
                         }
                     }
@@ -91,16 +91,16 @@ namespace JEDCMobilityManager
             }
         }
 
-        private IEnumerable<Tuple<int, Point>> EnumeratePoints(string connection)
+        private IEnumerable<Tuple<int, Point, DateTime>> EnumeratePoints(string connection)
         {
             using (var sql = new SqlConnection(connection))
-            using (var cmd = new SqlCommand("SELECT [PersonId], [Latitude], [Longitude] FROM [dbo].[Point]", sql))
+            using (var cmd = new SqlCommand("SELECT [PersonId], [Latitude], [Longitude], [TimeStamp] FROM [dbo].[Point]", sql))
             {
                 sql.Open();
 
                 using (var reader = cmd.ExecuteReader())
                     while (reader.Read())
-                        yield return Tuple.Create(reader.GetInt32(0), new Point((double) reader.GetDecimal(2), (double) reader.GetDecimal(1)));
+                        yield return Tuple.Create(reader.GetInt32(0), new Point((double) reader.GetDecimal(2), (double) reader.GetDecimal(1)), reader.GetDateTime(3).Date.AddHours(reader.GetDateTime(3).Hour));
 
                 sql.Close();
             }
@@ -109,8 +109,8 @@ namespace JEDCMobilityManager
         private class ResultManager : IDisposable
         {
             private SqlConnection Sql { get; }
-            private IDictionary<int, IList<int>> Known { get; } = new Dictionary<int, IList<int>>();
-            private ConcurrentQueue<Tuple<int, int>> Imports { get; } = new ConcurrentQueue<Tuple<int, int>>();
+            private IDictionary<DateTime, IDictionary<int, IList<int>>> Known { get; } = new Dictionary<DateTime, IDictionary<int, IList<int>>>();
+            private ConcurrentQueue<Tuple<int, int, DateTime>> Imports { get; } = new ConcurrentQueue<Tuple<int, int, DateTime>>();
             private SemaphoreSlim ImportSignal { get; set; } = new SemaphoreSlim(0);
             private bool FinishProcessing { get; set; }
 
@@ -122,32 +122,37 @@ namespace JEDCMobilityManager
             public void LoadExisting()
             {
                 Sql.Open();
-                using (var cmd = new SqlCommand("SELECT [PersonId], [AreaId] FROM [dbo].[PersonArea]", Sql))
+                using (var cmd = new SqlCommand("SELECT [PersonId], [AreaId], [Date], [Hour] FROM [dbo].[PersonArea]", Sql))
                 using (var reader = cmd.ExecuteReader())
                     while (reader.Read())
-                        Add(reader.GetInt32(0), reader.GetInt32(1));
+                        Add(reader.GetInt32(0), reader.GetInt32(1), reader.GetDateTime(2).AddHours(reader.GetInt32(3)));
                 Sql.Close();
                 Imports.Clear();
                 ImportSignal = new SemaphoreSlim(0);
             }
 
-            public IList<int> GetKnown(int personId)
+            public IList<int> GetKnown(int personId, DateTime dateHour)
             {
-                return Known.TryGetValue(personId, out var areas) ? areas : new List<int>();
+                return Known.TryGetValue(dateHour, out var pa) && pa.TryGetValue(personId, out var areas) ? areas : new List<int>();
             }
 
-            public void Add(int personId, int areaId)
+            public void Add(int personId, int areaId, DateTime dateHour)
             {
                 lock (Known)
                 {
-                    if (!Known.TryGetValue(personId, out var areas))
+                    if (!Known.TryGetValue(dateHour, out var personAreas))
+                    {
+                        personAreas = new Dictionary<int, IList<int>>();
+                        Known.Add(dateHour, personAreas);
+                    }
+                    if (!personAreas.TryGetValue(personId, out var areas))
                     {
                         areas = new List<int>();
-                        Known.Add(personId, areas);
+                        personAreas.Add(personId, areas);
                     }
                     if (areas.Contains(areaId)) return;
                     areas.Add(areaId);
-                    Imports.Enqueue(Tuple.Create(personId, areaId));
+                    Imports.Enqueue(Tuple.Create(personId, areaId, dateHour));
                     ImportSignal.Release();
                 }
             }
@@ -163,10 +168,12 @@ namespace JEDCMobilityManager
                 FinishProcessing = false;
                 Sql.Open();
                 using (var transation = Sql.BeginTransaction())
-                using (var cmd = new SqlCommand("INSERT INTO [dbo].[PersonArea] ([PersonId], [AreaId]) VALUES (@personId, @areaId)", Sql, transation))
+                using (var cmd = new SqlCommand("INSERT INTO [dbo].[PersonArea] ([PersonId], [AreaId], [Date], [Hour]) VALUES (@personId, @areaId, @date, @hour)", Sql, transation))
                 {
                     var personId = cmd.Parameters.Add("@personId", SqlDbType.Int);
                     var areaId = cmd.Parameters.Add("@areaId", SqlDbType.Int);
+                    var date = cmd.Parameters.Add("@date", SqlDbType.Date);
+                    var hour = cmd.Parameters.Add("@hour", SqlDbType.TinyInt);
                     while (!FinishProcessing || !Imports.IsEmpty)
                     {
                         await ImportSignal.WaitAsync();
@@ -174,6 +181,8 @@ namespace JEDCMobilityManager
                         {
                             personId.Value = item.Item1;
                             areaId.Value = item.Item2;
+                            date.Value = item.Item3.Date;
+                            hour.Value = item.Item3.Hour;
                             cmd.ExecuteNonQuery();
                         }
                     }

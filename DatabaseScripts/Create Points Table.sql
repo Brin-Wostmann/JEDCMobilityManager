@@ -52,12 +52,14 @@ GO
 
 CREATE TABLE [dbo].[PersonArea] (
 	[PersonId] INT NOT NULL,
-	[AreaId] INT NOT NULL
+	[AreaId] INT NOT NULL,
+	[Date] [DATE] NOT NULL,
+	[Hour] [TINYINT] NOT NULL
 )
 GO
 
 ALTER TABLE [dbo].[PersonArea]  
-ADD CONSTRAINT [UQ_PersonArea] UNIQUE ([PersonId], [AreaId])
+ADD CONSTRAINT [UQ_PersonArea] UNIQUE ([PersonId], [AreaId], [Date], [Hour])
 
 ALTER TABLE [dbo].[PersonArea] 
 ADD CONSTRAINT [FK_PersonArea_Person] FOREIGN KEY ([PersonId]) 
