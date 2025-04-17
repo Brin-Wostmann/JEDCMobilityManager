@@ -9,4 +9,3 @@
     some: { value: Array.prototype.some },
     find: { value: Array.prototype.find }
 }));
-
