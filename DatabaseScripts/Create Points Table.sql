@@ -81,3 +81,43 @@ FROM [dbo].[PersonArea] PA
 CREATE VIEW [dbo].[vw_PersonArea_Hourly] AS
 SELECT DISTINCT [PersonId], [AreaId], [Date], [Hour]
 FROM [dbo].[PersonArea] PA
+
+CREATE VIEW [dbo].[vw_Total_All] AS
+SELECT V.[AreaId], V.[0] AS [Visitors], V.[1] AS [Residents]
+FROM (
+    SELECT PA.[AreaId], P.[IsResident], COUNT(*) AS [Count]
+    FROM [dbo].[vw_PersonArea_All] PA
+    JOIN [dbo].[Person] P ON P.[Id] = PA.[PersonId]
+    GROUP BY PA.[AreaId], P.[IsResident]
+) B
+PIVOT (
+    SUM(B.[Count])
+    FOR B.[IsResident] IN ([0], [1])
+) V
+
+CREATE VIEW [dbo].[vw_Total_Daily] AS
+SELECT V.[AreaId], V.[Date], V.[0] AS [Visitors], V.[1] AS [Residents]
+FROM (
+    SELECT PA.[AreaId], PA.[Date], P.[IsResident], COUNT(*) AS [Count]
+    FROM [dbo].[vw_PersonArea_Daily] PA
+    JOIN [dbo].[Person] P ON P.[Id] = PA.[PersonId]
+    GROUP BY PA.[AreaId], PA.[Date], P.[IsResident]
+) B
+PIVOT (
+    SUM(B.[Count])
+    FOR B.[IsResident] IN ([0], [1])
+) V
+
+CREATE VIEW [dbo].[vw_Total_Hourly] AS
+SELECT V.[AreaId], V.[Date], V.[Hour], V.[0] AS [Visitors], V.[1] AS [Residents]
+FROM (
+    SELECT PA.[AreaId], PA.[Date], PA.[Hour], P.[IsResident], COUNT(*) AS [Count]
+    FROM [dbo].[vw_PersonArea_Hourly] PA
+    JOIN [dbo].[Person] P ON P.[Id] = PA.[PersonId]
+    GROUP BY PA.[AreaId], PA.[Date], PA.[Hour], P.[IsResident]
+) B
+PIVOT (
+    SUM(B.[Count])
+    FOR B.[IsResident] IN ([0], [1])
+) V
+

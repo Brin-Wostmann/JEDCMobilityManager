@@ -25,17 +25,8 @@ namespace JEDCMobilityManager.Web.Controllers
         }
 
         private const string FeatureQuery = @"
-            SELECT A.[Id], A.[Name], A.[Shape].STAsText(), V.[0] AS [Visitors], V.[1] AS [Residents]
-            FROM (
-	            SELECT PA.[AreaId], P.[IsResident], COUNT(*) AS [Count]
-	            FROM [dbo].[PersonArea] PA
-	            JOIN [dbo].[Person] P ON P.[Id] = PA.[PersonId]
-	            GROUP BY PA.[AreaId], P.[IsResident]
-            ) B
-            PIVOT (
-	            SUM(B.[Count])
-	            FOR B.[IsResident] IN ([0], [1])
-            ) V
-            RIGHT JOIN [dbo].[Area] A ON A.[Id] = V.[AreaId]";
+            SELECT A.[Id], A.[Name], A.[Shape].STAsText(), T.[Visitors], T.[Residents]
+            FROM [dbo].[Area] A
+            LEFT JOIN [dbo].[vw_Total_All] T ON T.[AreaId] = A.[Id]";
     }
 }
