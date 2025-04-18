@@ -1,4 +1,4 @@
-﻿@model Tuple<string>
+﻿@model HomeController
 @{
     ViewData["Title"] = "Mobility Statistics";
 }
@@ -7,12 +7,12 @@
     <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
     <script>
+        window.layers = {};
         customElements.define("x-map", class xMap extends HTMLElement {
             constructor() { super(); }
             get latitude() { return parseFloat(this.getAttribute("latitude")) || 0; }
             get longitude() { return parseFloat(this.getAttribute("longitude")) || 0; }
             get zoom() { return parseFloat(this.getAttribute("zoom")) || 5; }
-            layers = {};
             connectedCallback() {
                 this.map = new maplibregl.Map({
                     container: this,
@@ -21,43 +21,35 @@
                     zoom: this.zoom
                 });
                 this.map.addControl(new maplibregl.NavigationControl());
-                setTimeout(function () {
-                    this.map.on("load", this.switchLayer.bind(this, this.#readChildData()));
+            }
+            switchLayer(name, data) {
+                this.map.on("load", function () {
+                    this.map.addSource(name, {
+                        type: "geojson",
+                        data: data
+                    });
+                    this.map.addLayer({
+                        id: name,
+                        type: "fill",
+                        source: name,
+                        layout: {},
+                        paint: {
+                            "fill-color": "#088",
+                            "fill-opacity": 0.5
+                        }
+                    });
+                    this.map.addLayer({
+                        id: name + "-outline",
+                        type: "line",
+                        source: name,
+                        layout: {},
+                        paint: {
+                            "line-color": "#000",
+                            "line-width": 2
+                        }
+                    });
+
                 }.bind(this));
-            }
-            switchLayer(name) {
-                this.map.addSource(name, {
-                    type: "geojson",
-                    data: this.layers[name]
-                });
-                this.map.addLayer({
-                    id: name,
-                    type: "fill",
-                    source: name,
-                    layout: {},
-                    paint: {
-                        "fill-color": "#088",
-                        "fill-opacity": 0.5
-                    }
-                });
-                this.map.addLayer({
-                    id: name + "-outline",
-                    type: "line",
-                    source: name,
-                    layout: {},
-                    paint: {
-                        "line-color": "#000",
-                        "line-width": 2
-                    }
-                });
-            }
-            #readChildData() {
-                return this.querySelectorAll("script[type='text/geojson']").reduce(function (name, script) {
-                    name = script.getAttribute("name");
-                    this.layers[name] = JSON.parse(script.textContent);
-                    script.remove();
-                    return name;
-                }.bind(this), null);
             }
         });
         document.addEventListener("click", function (e) {
@@ -66,6 +58,12 @@
                 a.removeAttribute("selected");
             });
             e.target.setAttribute("selected", "selected");
+        });
+    </script>
+    <script>
+        window.layers["RD"] = @Html.Raw(Model.Features("RD"));
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelector("x-map").switchLayer("RD", window.layers["RD"]);
         });
     </script>
     <style>
@@ -101,14 +99,8 @@
 }
 
 <h1>Mobility Statistics</h1>
-
 <flex id="featureTypeSelect">
     <div class="All" selected="selected">All</div>
     <div class="RD">Ranger Districts</div>
 </flex>
-
-<x-map style="height: 700px; width: 700px; resize: both;  display: block;" latitude="58.3005" longitude="-134.4201" zoom="5">
-    <script type="text/geojson" name="RD" title="Ranger Districts">
-        @Html.Raw(Model.Item1)
-    </script>
-</x-map>
+<x-map style="height: 700px; width: 700px; resize: both;  display: block;" latitude="58.3005" longitude="-134.4201" zoom="5"></x-map>

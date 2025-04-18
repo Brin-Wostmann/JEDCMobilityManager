@@ -7,7 +7,7 @@ namespace JEDCMobilityManager.Web.Controllers
     {
         public IActionResult Index()
         {
-            return View(Tuple.Create(Features("RD")));
+            return View(this);
         }
 
         public string Features(string name)
