@@ -59,11 +59,32 @@
             });
             e.target.setAttribute("selected", "selected");
         });
+        function switchFeatures (name) {
+            var layer = window.layers[name];
+            document.querySelectorAll("x-map").forEach(function (a) { a.switchLayer(name, layer); });
+            var overviewBody = overview.querySelector("tbody");
+            overviewBody.innerHTML = "";
+            layer.features.forEach(function (feature) {
+                var row = document.createElement("tr");
+                overviewBody.appendChild(row);
+                cell(feature.properties.name);
+                cell(feature.properties.residents);
+                cell(feature.properties.visitors);
+                cell(feature.properties.residents + feature.properties.visitors);
+
+
+                function cell(text) {
+                    var cell = document.createElement("td");
+                    row.appendChild(cell);
+                    cell.innerText = text;
+                }
+            });
+        }
     </script>
     <script>
         window.layers["RD"] = @Html.Raw(Model.Features("RD"));
         document.addEventListener("DOMContentLoaded", function () {
-            document.querySelector("x-map").switchLayer("RD", window.layers["RD"]);
+            switchFeatures("RD");
         });
     </script>
     <style>
@@ -100,7 +121,19 @@
 
 <h1>Mobility Statistics</h1>
 <flex id="featureTypeSelect">
-    <div class="All" selected="selected">All</div>
-    <div class="RD">Ranger Districts</div>
+    <div class="All">All</div>
+    <div class="RD" selected="selected">Ranger Districts</div>
 </flex>
-<x-map style="height: 700px; width: 700px; resize: both;  display: block;" latitude="58.3005" longitude="-134.4201" zoom="5"></x-map>
+<flex>
+    <x-map style="height: 700px; width: 700px; resize: both;  display: block;" latitude="58.3005" longitude="-134.4201" zoom="5"></x-map>
+    <table id="overview">
+        <caption>Overview:</caption>
+        <thead>
+            <th></th>
+            <th>Residents</th></th>
+            <th>Visitors</th>
+            <th>Total</th>
+        </thead>
+        <tbody></tbody>
+    </table>
+</flex>

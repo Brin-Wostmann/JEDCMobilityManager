@@ -13,5 +13,14 @@ body > * {
 
 flex {
     display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
 }
 
+table {
+    border-collapse: collapse;
+}
+
+table :is(td, th) {
+    border: 1px solid #333;
+}
