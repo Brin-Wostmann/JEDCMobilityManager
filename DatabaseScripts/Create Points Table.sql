@@ -70,19 +70,25 @@ ADD CONSTRAINT [FK_PersonArea_Area] FOREIGN KEY ([AreaId])
 REFERENCES [dbo].[Area] ([Id]) 
 GO
 
-CREATE VIEW [dbo].[vw_PersonArea_All] AS
+CREATE VIEW [dbo].[vw_PersonArea_All] AS (
 SELECT DISTINCT [PersonId], [AreaId]
 FROM [dbo].[PersonArea] PA
+)
+GO
 
-CREATE VIEW [dbo].[vw_PersonArea_Daily] AS
+CREATE VIEW [dbo].[vw_PersonArea_Daily] AS (
 SELECT DISTINCT [PersonId], [AreaId], [Date]
 FROM [dbo].[PersonArea] PA
+)
+GO
 
-CREATE VIEW [dbo].[vw_PersonArea_Hourly] AS
+CREATE VIEW [dbo].[vw_PersonArea_Hourly] AS (
 SELECT DISTINCT [PersonId], [AreaId], [Date], [Hour]
 FROM [dbo].[PersonArea] PA
+)
+GO
 
-CREATE VIEW [dbo].[vw_Total_All] AS
+CREATE VIEW [dbo].[vw_Total_All] AS (
 SELECT V.[AreaId], V.[0] AS [Visitors], V.[1] AS [Residents]
 FROM (
     SELECT PA.[AreaId], P.[IsResident], COUNT(*) AS [Count]
@@ -94,8 +100,10 @@ PIVOT (
     SUM(B.[Count])
     FOR B.[IsResident] IN ([0], [1])
 ) V
+)
+GO
 
-CREATE VIEW [dbo].[vw_Total_Daily] AS
+CREATE VIEW [dbo].[vw_Total_Daily] AS (
 SELECT V.[AreaId], V.[Date], V.[0] AS [Visitors], V.[1] AS [Residents]
 FROM (
     SELECT PA.[AreaId], PA.[Date], P.[IsResident], COUNT(*) AS [Count]
@@ -107,8 +115,10 @@ PIVOT (
     SUM(B.[Count])
     FOR B.[IsResident] IN ([0], [1])
 ) V
+)
+GO
 
-CREATE VIEW [dbo].[vw_Total_Hourly] AS
+CREATE VIEW [dbo].[vw_Total_Hourly] AS (
 SELECT V.[AreaId], V.[Date], V.[Hour], V.[0] AS [Visitors], V.[1] AS [Residents]
 FROM (
     SELECT PA.[AreaId], PA.[Date], PA.[Hour], P.[IsResident], COUNT(*) AS [Count]
@@ -120,4 +130,6 @@ PIVOT (
     SUM(B.[Count])
     FOR B.[IsResident] IN ([0], [1])
 ) V
+)
+GO
 
