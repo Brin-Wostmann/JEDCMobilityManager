@@ -24,7 +24,7 @@ FROM OPENJSON(@json) WITH (
 	[QuadId] CHAR(64) '$.quad_id'
 );
 
-INSERT INTO [dbo].[Person]
+INSERT INTO [dbo].[Person] ([QuadId])
 SELECT DISTINCT I.[QuadId]
 FROM #Import I
 LEFT JOIN [dbo].[Person] P ON P.[QuadId] = I.[QuadId]
