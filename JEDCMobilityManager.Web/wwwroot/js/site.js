@@ -9,3 +9,7 @@
     some: { value: Array.prototype.some },
     find: { value: Array.prototype.find }
 }));
+
+function getMonthName(m) {
+    return new Date(2000, m-1, 1).toLocaleString("default", { month: 'long' });
+}

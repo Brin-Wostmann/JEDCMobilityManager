@@ -90,31 +90,38 @@
                 if (!response.ok)
                     throw new Error(`HTTP error! status: ${response.status}`);
                 return response.json();
-            }).then(function (data) {
-                document.querySelectorAll("table[statistics]").forEach(function (table) {
-                    (function (c) { table.innerHTML = ""; table.appendChild(c); })(table.querySelector("caption"));
-                    (function (part) {
-                        var ks = Object.keys(part[0]);
-                        (function(r) {
-                            table.appendChild(r);
-                            ks.forEach(function (k) {
-                                var c = document.createElement("th");
-                                r.appendChild(c);
-                                c.innerText = k;
-                            });
-                        })(document.createElement("tr"));
-                        part.forEach(function (item) {
-                            var r = document.createElement("tr");
-                            table.appendChild(r);
-                            ks.forEach(function(k) {
-                                var c = document.createElement("td");
-                                r.appendChild(c);
-                                c.innerText = item[k];
-                            });
-                        });
-                    })(data[table.getAttribute("statistics")]);
+            }).then((function (tables) {
+                tables.forEach(function(t) {
+                    var s = t.querySelector("script[type='text/data']")?.innerHTML ?? "";
+                    t.formatter = Function("item", s);
                 });
-            }).catch(function (error) {
+                return function (data) {
+                    tables.forEach(function (table) {
+                        (function (c) { table.innerHTML = ""; table.appendChild(c); })(table.querySelector("caption"));
+                        (function (part) {
+                            var ks = Object.keys(part[0]);
+                            (function (r) {
+                                table.appendChild(r);
+                                ks.forEach(function (k) {
+                                    var c = document.createElement("th");
+                                    r.appendChild(c);
+                                    c.innerText = k;
+                                });
+                            })(document.createElement("tr"));
+                            part.forEach(function (item) {
+                                table.formatter(item);
+                                var r = document.createElement("tr");
+                                table.appendChild(r);
+                                ks.forEach(function (k) {
+                                    var c = document.createElement("td");
+                                    r.appendChild(c);
+                                    c.innerText = item[k];
+                                });
+                            });
+                        })(data[table.getAttribute("statistics")]);
+                    });
+                };
+            })(document.querySelectorAll("table[statistics]"))).catch(function (error) {
                 console.error("Error fetching data:", error);
             });
         });
@@ -171,6 +178,9 @@
 </flex>
 <table statistics="MonthTotals">
     <caption>Monthly Totals</caption>
+    <script type="text/data">
+        item["Month"] = getMonthName(item["Month"]);
+    </script>
 </table>
 <table statistics="AvgHourly">
     <caption>Average Hourly</caption>
