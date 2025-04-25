@@ -59,6 +59,7 @@
             });
             e.target.setAttribute("selected", "selected");
         });
+
         function switchFeatures (name) {
             var layer = window.layers[name];
             document.querySelectorAll("x-map").forEach(function (a) { a.switchLayer(name, layer); });
