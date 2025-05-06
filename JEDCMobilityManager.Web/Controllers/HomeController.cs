@@ -48,15 +48,24 @@ namespace JEDCMobilityManager.Web.Controllers
 
         private static IDictionary<string, string> FeatureStatisticQueries { get; } = new Dictionary<string, string> {
             { "MonthTotals", @"
-                SELECT T.[Month], A.[Name], T.[Visitors], T.[Residents]
-                FROM [dbo].[Area] A
-                LEFT JOIN (
-	                SELECT [AreaId], MONTH([Date]) [Month], SUM([Visitors]) [Visitors], SUM([Residents]) [Residents]
-	                FROM [dbo].[vw_Total_Daily]
-                    {0}
-	                GROUP BY [AreaId], MONTH([Date])
-                ) T ON T.[AreaId] = A.[Id]
-                ORDER BY A.[Id], T.[Month]" },
+                SELECT V.[Month], A.[Name], V.[0] AS [Visitors], V.[1] AS [Residents]
+                FROM (
+                    SELECT PA.[AreaId], PA.[Month], P.[IsResident], COUNT(*) AS [Count]
+                    FROM (
+		                SELECT DISTINCT [PersonId], [AreaId], MONTH([Date]) [Month]
+		                FROM [dbo].[PersonArea]
+		                --where [Date] >= '7/1/2024'
+		                --  and [Date] < '8/1/2024'
+	                ) PA
+                    JOIN [dbo].[Person] P ON P.[Id] = PA.[PersonId]
+                    GROUP BY PA.[AreaId], PA.[Month], P.[IsResident]
+                ) B
+                PIVOT (
+                    SUM(B.[Count])
+                    FOR B.[IsResident] IN ([0], [1])
+                ) V
+                RIGHT JOIN [dbo].[Area] A ON v.[AreaId] = A.[Id]
+                ORDER BY A.[Id], V.[Month]" },
             { "AvgHourly", @"
                 SELECT T.[Hour], A.[Name], T.[AvgVisitors], T.[AvgResidents]
                 FROM [dbo].[Area] A
