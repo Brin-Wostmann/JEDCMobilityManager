@@ -1,16 +1,17 @@
 ﻿using System.Data;
-using System.Globalization;
-using CsvHelper;
+using System.Text.Json;
 using Microsoft.Data.SqlClient;
+using NetTopologySuite.Geometries;
+using NetTopologySuite.IO;
 
 namespace JEDCMobilityManager
 {
-    internal class ShapeLoader : SqlScript
+    internal class GeoJsonShapeLoader : SqlScript
     {
         private string ShapeFile { get; }
         private string Group { get; }
 
-        public ShapeLoader(string shapeFile, string group)
+        public GeoJsonShapeLoader(string shapeFile, string group)
         {
             ShapeFile = shapeFile;
             Group = group;
@@ -23,19 +24,17 @@ namespace JEDCMobilityManager
                 sql.Open();
                 using (var transation = sql.BeginTransaction())
                 using (var cmd = new SqlCommand("INSERT INTO [dbo].[Area] ([Name], [Shape], [Group]) VALUES (@name, geography::STGeomFromText(@shape, 4326), @group)", sql, transation))
-                using (var reader = new StreamReader(ShapeFile))
-                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+                using (var jdoc = JsonDocument.Parse(File.ReadAllText(ShapeFile)))
                 {
+                    var geoReader = new GeoJsonReader();
                     var nameParam = cmd.Parameters.Add("@name", SqlDbType.NVarChar);
                     var shapeParam = cmd.Parameters.Add("@shape", SqlDbType.NVarChar);
                     var groupParam = cmd.Parameters.Add("@group", SqlDbType.NVarChar);
 
-                    csv.Read();
-                    csv.ReadHeader();
-                    while (csv.Read())
+                    foreach (var feature in jdoc.RootElement.GetProperty("features").EnumerateArray())
                     {
-                        nameParam.Value = csv.GetField("districtname");
-                        shapeParam.Value = csv.GetField("SHAPE@WKT");
+                        nameParam.Value = feature.GetProperty("properties").GetProperty("CommunityName").GetString();
+                        shapeParam.Value = geoReader.Read<Geometry>(feature.GetProperty("geometry").ToString()).ToText();
                         groupParam.Value = Group;
                         cmd.ExecuteNonQuery();
                     }
