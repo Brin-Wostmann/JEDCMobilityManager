@@ -19,6 +19,7 @@ namespace JEDCMobilityManager
             var rTask = Task.Run(() => Results.LoadExisting());
 
             Areas = Area.GetAll(connection);
+            Areas.Simplify(0.1);
             Envelope = Areas.FindIntersections();
 
             rTask.Wait();
@@ -36,7 +37,7 @@ namespace JEDCMobilityManager
             var maxThreads = Environment.ProcessorCount;
             var chunkQueue = new ConcurrentQueue<IEnumerable<Tuple<int, Point, DateTime>>>();
             var chunkSignal = new SemaphoreSlim(0);
-            var capacitySignal = new SemaphoreSlim(maxThreads * 3, maxThreads * 3);
+            var capacitySignal = new SemaphoreSlim(maxThreads, maxThreads);
             var done = false;
             var pointTasks = new Task[maxThreads];
             for (var i = 0; i < maxThreads; i++)
@@ -125,7 +126,7 @@ namespace JEDCMobilityManager
                 using (var cmd = new SqlCommand("SELECT [PersonId], [AreaId], [Date], [Hour] FROM [dbo].[PersonArea]", Sql))
                 using (var reader = cmd.ExecuteReader())
                     while (reader.Read())
-                        Add(reader.GetInt32(0), reader.GetInt32(1), reader.GetDateTime(2).AddHours(reader.GetInt32(3)));
+                        Add(reader.GetInt32(0), reader.GetInt32(1), reader.GetDateTime(2).AddHours(reader.GetByte(3)));
                 Sql.Close();
                 Imports.Clear();
                 ImportSignal = new SemaphoreSlim(0);

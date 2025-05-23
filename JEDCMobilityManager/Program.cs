@@ -18,7 +18,7 @@ namespace JEDCMobilityManager
             //RunScript(new DataLoader(@"D:\JEDC Data\quadrant-io-mobility-data"));
             //RunScript(new ShapeLoader(@"D:\JEDC Data\DistrictBoundaries_WKT_WGS84_WKID4326.csv", "RD"));
             //RunScript(new GeoJsonShapeLoader(@"D:\JEDC Data\Alaska_Borough_and_Census_Area_Boundaries.geojson", "Borough"));
-            //RunScript(new ShapeAnalyzer());
+            RunScript(new ShapeAnalyzer());
         }
 
         public static void RunScript(SqlScript script)

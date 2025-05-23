@@ -1,6 +1,7 @@
 ﻿using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using Microsoft.Data.SqlClient;
+using NetTopologySuite.Simplify;
 
 namespace JEDCMobilityManager.Utility
 {
@@ -11,7 +12,7 @@ namespace JEDCMobilityManager.Utility
 
         public int Id { get; }
         public string Name { get; }
-        public Geometry Geometry { get; }
+        public Geometry Geometry { get; private set; }
         public Envelope Envelope { get; }
         public IList<Area> Intersects { get; } = new List<Area>();
         public string GeoJson { get; }
@@ -25,6 +26,11 @@ namespace JEDCMobilityManager.Utility
             Envelope = Geometry.EnvelopeInternal;
             GeoJson = Writer.Write(Geometry);
             OtherValues = otherValues;
+        }
+
+        public void Simplify(double tolderance = 0.01)
+        {
+            Geometry = TopologyPreservingSimplifier.Simplify(Geometry, tolderance);
         }
 
         public static IList<Area> GetAll(string connection, string? command = null)
@@ -48,6 +54,12 @@ namespace JEDCMobilityManager.Utility
 
     internal static class AreaExtensions
     {
+        public static void Simplify(this IList<Area> areas, double tolderance = 0.01)
+        {
+            foreach (var area in areas)
+                area.Simplify(tolderance);
+        }
+
         public static Envelope FindIntersections(this IList<Area> areas)
         {
             var envelope = new Envelope();
